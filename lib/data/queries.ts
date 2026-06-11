@@ -7,10 +7,12 @@
 // ─────────────────────────────────────────────
 
 import { prisma } from "@/lib/prisma";
+import { computePoints } from "@/lib/scoring";
 import type {
   Match,
   StandingTeam,
   LeaderboardEntry,
+  LiveLeaderboardEntry,
   BadgeDef,
   UserPrediction,
   UserStats,
@@ -48,6 +50,10 @@ function toUiMatch(m: DbMatch): Match {
             awayScore: m.result.awayScore,
             status: "FINISHED",
           }
+        : undefined,
+    live:
+      m.result && m.result.status === "LIVE"
+        ? { homeScore: m.result.homeScore, awayScore: m.result.awayScore }
         : undefined,
   };
 }
@@ -176,6 +182,73 @@ export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
       .map((entry, i) => ({ rank: i + 1, ...entry }));
   } catch {
     return [];
+  }
+}
+
+/**
+ * Classement LIVE : points acquis + points PROVISOIRES des matchs en cours
+ * (statut LIVE), recalculés à la volée. Renvoie aussi l'évolution ▲▼ de
+ * chaque joueur (vs le dernier match terminé) et un drapeau `hasLive`.
+ */
+export async function getLiveLeaderboard(): Promise<{
+  entries: LiveLeaderboardEntry[];
+  hasLive: boolean;
+}> {
+  try {
+    const [users, liveResults] = await Promise.all([
+      prisma.user.findMany({
+        where: { banned: false },
+        include: { score: true, badges: { include: { badge: true } } },
+      }),
+      prisma.result.findMany({
+        where: { status: "LIVE" },
+        include: { match: { include: { predictions: true } } },
+      }),
+    ]);
+
+    // Points provisoires par joueur, agrégés sur tous les matchs en cours.
+    const provisional = new Map<string, number>();
+    for (const r of liveResults) {
+      for (const p of r.match.predictions) {
+        const pts = computePoints(
+          { homeScore: p.homeScore, awayScore: p.awayScore },
+          { homeScore: r.homeScore, awayScore: r.awayScore },
+          p.joker
+        ).points;
+        provisional.set(p.userId, (provisional.get(p.userId) ?? 0) + pts);
+      }
+    }
+
+    const entries = users
+      .map((u) => {
+        const points = u.score?.points ?? 0;
+        const livePoints = provisional.get(u.id) ?? 0;
+        return {
+          name: u.name ?? "Anonyme",
+          email: u.email,
+          points,
+          livePoints,
+          total: points + livePoints,
+          exactScores: u.score?.exactScores ?? 0,
+          badges: u.badges.map((b) => b.badge.key),
+          previousRank: u.score?.previousRank ?? null,
+        };
+      })
+      .sort(
+        (a, b) =>
+          b.total - a.total ||
+          b.exactScores - a.exactScores ||
+          a.name.localeCompare(b.name)
+      )
+      .map(({ previousRank, ...e }, i) => ({
+        rank: i + 1,
+        evolution: previousRank != null ? previousRank - (i + 1) : null,
+        ...e,
+      }));
+
+    return { entries, hasLive: liveResults.length > 0 };
+  } catch {
+    return { entries: [], hasLive: false };
   }
 }
 

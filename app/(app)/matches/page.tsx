@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/page-header";
 import { MatchCardInteractive } from "@/components/match-card-interactive";
+import { LiveRefresher } from "@/components/live-refresher";
 import { Card } from "@/components/ui/card";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -33,6 +34,7 @@ export default async function MatchesPage() {
   const finishedCount = matches.filter(
     (m) => m.result?.status === "FINISHED"
   ).length;
+  const hasLive = matches.some((m) => m.live);
 
   // Pronostics de l'utilisateur + jokers utilisés par phase (pour l'inline).
   const predByMatch = new Map<
@@ -71,6 +73,8 @@ export default async function MatchesPage() {
 
   return (
     <>
+      {hasLive && <LiveRefresher seconds={30} />}
+
       {/* ── Header ── */}
       <PageHeader title="Matchs" subtitle="Coupe du Monde 2026" />
 

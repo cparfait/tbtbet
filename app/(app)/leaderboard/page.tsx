@@ -1,7 +1,9 @@
+import { ArrowUp, ArrowDown, Minus, Radio } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
+import { LiveRefresher } from "@/components/live-refresher";
 import { cn } from "@/lib/utils";
-import { getLeaderboard, getBadges } from "@/lib/data/queries";
+import { getLiveLeaderboard, getBadges } from "@/lib/data/queries";
 
 export const metadata = { title: "Classement · DaronsFC" };
 export const dynamic = "force-dynamic";
@@ -9,18 +11,33 @@ export const dynamic = "force-dynamic";
 const MEDALS = ["\u{1F947}", "\u{1F948}", "\u{1F949}"];
 
 export default async function LeaderboardPage() {
-  const [sorted, badges] = await Promise.all([getLeaderboard(), getBadges()]);
-  const top3 = sorted.slice(0, 3);
-  const rest = sorted;
+  const [{ entries, hasLive }, badges] = await Promise.all([
+    getLiveLeaderboard(),
+    getBadges(),
+  ]);
+  const top3 = entries.slice(0, 3);
 
   const badgeEmoji = (key: string) =>
     badges.find((b) => b.key === key)?.emoji ?? "";
 
   return (
     <>
-      <PageHeader title="Classement" subtitle="La bande des darons" />
+      {hasLive && <LiveRefresher seconds={30} />}
 
-      {sorted.length === 0 && (
+      <PageHeader
+        title="Classement"
+        subtitle="La bande des darons"
+        action={
+          hasLive ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-red-400">
+              <Radio className="size-3 animate-pulse" />
+              Live
+            </span>
+          ) : undefined
+        }
+      />
+
+      {entries.length === 0 && (
         <Card className="glass mt-4 p-8 text-center">
           <p className="text-sm text-[var(--color-muted)]">
             Aucun joueur classé pour l&apos;instant. Les points arrivent après
@@ -31,41 +48,26 @@ export default async function LeaderboardPage() {
 
       {/* ── Podium ── */}
       <div className="flex items-end justify-center gap-3 px-2 pt-4 pb-8">
-        {/* 2nd place — left */}
         {top3[1] && (
-          <PodiumCard
-            rank={2}
-            name={top3[1].name}
-            points={top3[1].points}
-            index={1}
-          />
+          <PodiumCard rank={2} name={top3[1].name} points={top3[1].total} index={1} />
         )}
-
-        {/* 1st place — center, bigger */}
         {top3[0] && (
           <PodiumCard
             rank={1}
             name={top3[0].name}
-            points={top3[0].points}
+            points={top3[0].total}
             index={0}
             champion
           />
         )}
-
-        {/* 3rd place — right */}
         {top3[2] && (
-          <PodiumCard
-            rank={3}
-            name={top3[2].name}
-            points={top3[2].points}
-            index={2}
-          />
+          <PodiumCard rank={3} name={top3[2].name} points={top3[2].total} index={2} />
         )}
       </div>
 
-      {/* ── Full Ranking ── */}
+      {/* ── Classement complet ── */}
       <div className="flex flex-col gap-2">
-        {rest.map((user, i) => {
+        {entries.map((user, i) => {
           const isTop3 = i < 3;
           const isChampion = i === 0;
 
@@ -78,24 +80,22 @@ export default async function LeaderboardPage() {
                   "border-[var(--color-gold)]/30 bg-[var(--color-gold)]/[0.04]"
               )}
             >
-              {/* Rank */}
-              <span
-                className={cn(
-                  "w-8 text-center font-[family-name:var(--font-display)] text-lg font-bold",
-                  isChampion && "text-[var(--color-gold)]"
-                )}
-              >
-                {isTop3 ? MEDALS[i] : i + 1}
-              </span>
-
-              {/* Name + badges */}
-              <div className="min-w-0 flex-1">
-                <p
+              {/* Rang + évolution */}
+              <div className="flex w-9 shrink-0 flex-col items-center">
+                <span
                   className={cn(
-                    "truncate font-medium",
-                    isChampion && "font-bold"
+                    "font-[family-name:var(--font-display)] text-lg font-bold leading-none",
+                    isChampion && "text-[var(--color-gold)]"
                   )}
                 >
+                  {isTop3 ? MEDALS[i] : i + 1}
+                </span>
+                <Evolution value={user.evolution} />
+              </div>
+
+              {/* Nom + badges */}
+              <div className="min-w-0 flex-1">
+                <p className={cn("truncate font-medium", isChampion && "font-bold")}>
                   {user.name}
                 </p>
                 <div className="flex items-center gap-2">
@@ -105,24 +105,29 @@ export default async function LeaderboardPage() {
                     </span>
                   )}
                   <span className="font-[family-name:var(--font-mono)] text-xs text-[var(--color-muted)]">
-                    {user.exactScores} score
-                    {user.exactScores !== 1 ? "s" : ""} exact
-                    {user.exactScores !== 1 ? "s" : ""}
+                    {user.exactScores} exact{user.exactScores !== 1 ? "s" : ""}
                   </span>
                 </div>
               </div>
 
-              {/* Points */}
-              <span
-                className={cn(
-                  "font-[family-name:var(--font-display)] text-2xl font-bold tabular-nums",
-                  isChampion
-                    ? "text-[var(--color-gold-bright)]"
-                    : "text-[var(--color-gold)]"
+              {/* Points (+ provisoires en direct) */}
+              <div className="flex shrink-0 flex-col items-end">
+                <span
+                  className={cn(
+                    "font-[family-name:var(--font-display)] text-2xl font-bold tabular-nums",
+                    isChampion
+                      ? "text-[var(--color-gold-bright)]"
+                      : "text-[var(--color-gold)]"
+                  )}
+                >
+                  {user.total}
+                </span>
+                {user.livePoints > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-red-400">
+                    <Radio className="size-2.5 animate-pulse" />+{user.livePoints} live
+                  </span>
                 )}
-              >
-                {user.points}
-              </span>
+              </div>
             </Card>
           );
         })}
@@ -131,8 +136,29 @@ export default async function LeaderboardPage() {
   );
 }
 
-/* ─── Podium card ─── */
+/* ─── Flèche d'évolution ─── */
+function Evolution({ value }: { value: number | null }) {
+  if (value == null) return null;
+  if (value > 0) {
+    return (
+      <span className="inline-flex items-center text-[10px] font-bold leading-none text-[var(--color-pitch-bright)]">
+        <ArrowUp className="size-3" />
+        {value}
+      </span>
+    );
+  }
+  if (value < 0) {
+    return (
+      <span className="inline-flex items-center text-[10px] font-bold leading-none text-red-400">
+        <ArrowDown className="size-3" />
+        {Math.abs(value)}
+      </span>
+    );
+  }
+  return <Minus className="size-3 text-[var(--color-muted)]/50" />;
+}
 
+/* ─── Podium card ─── */
 function PodiumCard({
   rank,
   name,
@@ -157,14 +183,12 @@ function PodiumCard({
       )}
       style={{ animationDelay: champion ? "0ms" : `${(index + 1) * 150}ms` }}
     >
-      {/* Crown for 1st */}
       {champion && (
         <span className="text-2xl drop-shadow-[0_0_8px_var(--color-gold)]">
           {"\u{1F451}"}
         </span>
       )}
 
-      {/* Avatar */}
       <div
         className={cn(
           "flex items-center justify-center rounded-full border-2 font-[family-name:var(--font-display)] font-bold",
@@ -176,7 +200,6 @@ function PodiumCard({
         {name[0]}
       </div>
 
-      {/* Info */}
       <p
         className={cn(
           "font-[family-name:var(--font-display)] font-semibold",
@@ -196,7 +219,6 @@ function PodiumCard({
         {points} pts
       </p>
 
-      {/* Pedestal */}
       <div
         className={cn(
           "w-full rounded-t-lg",

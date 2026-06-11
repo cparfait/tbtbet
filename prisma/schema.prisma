@@ -89,6 +89,7 @@ model Score {
   points         Int    @default(0)
   exactScores    Int    @default(0)
   correctResults Int    @default(0)
+  previousRank   Int? // rang avant le dernier match terminé (pour l'évolution ▲▼)
   user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 

@@ -3,11 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Minus, Plus, Check, Loader2, Lock, ChevronRight } from "lucide-react";
+import { Minus, Plus, Check, Loader2, Lock, ChevronRight, Radio } from "lucide-react";
 import { CountdownTimer } from "./countdown-timer";
 import { Card } from "./ui/card";
 import { Flag } from "./flag";
 import { cn } from "@/lib/utils";
+import { computePoints } from "@/lib/scoring";
 import { STAGE_LABELS, type Match } from "@/lib/data/matches";
 
 type Props = {
@@ -78,9 +79,22 @@ export function MatchCardInteractive({
   const [error, setError] = useState<string | null>(null);
 
   const finished = match.result?.status === "FINISHED";
+  const live = match.live;
   const locked = Date.now() >= new Date(match.kickoffAt).getTime();
+  const readOnly = finished || locked || !!live;
   const group = match.group ? `Groupe ${match.group}` : STAGE_LABELS[match.stage];
   const canUseJoker = jokersLeft > 0 || joker;
+
+  // Points (réels si terminé, provisoires si en cours) du prono de l'utilisateur.
+  const refScore = finished ? match.result : live;
+  const userPoints =
+    refScore && prediction
+      ? computePoints(
+          { homeScore: prediction.homeScore, awayScore: prediction.awayScore },
+          { homeScore: refScore.homeScore, awayScore: refScore.awayScore },
+          prediction.joker
+        ).points
+      : null;
 
   const dirty =
     home !== (prediction?.homeScore ?? 0) ||
@@ -120,34 +134,56 @@ export function MatchCardInteractive({
           <span className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 font-semibold uppercase tracking-wider">
             Terminé
           </span>
+        ) : live ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 font-bold uppercase tracking-wider text-red-400">
+            <Radio className="size-3 animate-pulse" /> En direct
+          </span>
         ) : (
           <CountdownTimer target={match.kickoffAt} />
         )}
       </div>
 
-      {finished || locked ? (
-        /* ── Lecture seule : score / prono ── */
+      {readOnly ? (
+        /* ── Lecture seule : score (final/live) + prono + points ── */
         <div className="space-y-2">
           <ReadOnlyRow
             flag={match.homeFlag}
             name={match.homeTeam}
-            score={finished ? match.result?.homeScore : undefined}
+            score={refScore?.homeScore}
+            live={!!live}
           />
           <ReadOnlyRow
             flag={match.awayFlag}
             name={match.awayTeam}
-            score={finished ? match.result?.awayScore : undefined}
+            score={refScore?.awayScore}
+            live={!!live}
           />
           <div className="flex items-center justify-between border-t border-[var(--color-border-subtle)] pt-2 text-xs">
             {prediction ? (
-              <span className="text-[var(--color-muted)]">
-                Ton prono :{" "}
-                <span className="font-[family-name:var(--font-mono)] font-semibold text-[var(--color-gold)]">
-                  {prediction.homeScore} – {prediction.awayScore}
+              <span className="flex items-center gap-1.5 text-[var(--color-muted)]">
+                <span>
+                  Prono :{" "}
+                  <span className="font-[family-name:var(--font-mono)] font-semibold text-[var(--color-gold)]">
+                    {prediction.homeScore} – {prediction.awayScore}
+                  </span>
+                  {prediction.joker && (
+                    <span className="ml-1.5 rounded bg-[var(--color-gold)]/15 px-1.5 py-0.5 font-semibold text-[var(--color-gold)]">
+                      ×2
+                    </span>
+                  )}
                 </span>
-                {prediction.joker && (
-                  <span className="ml-1.5 rounded bg-[var(--color-gold)]/15 px-1.5 py-0.5 font-semibold text-[var(--color-gold)]">
-                    ×2
+                {userPoints !== null && (
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 py-0.5 font-bold",
+                      live
+                        ? "bg-red-500/15 text-red-400"
+                        : userPoints > 0
+                          ? "bg-[var(--color-pitch)]/15 text-[var(--color-pitch-bright)]"
+                          : "bg-[var(--color-surface-2)] text-[var(--color-muted)]"
+                    )}
+                  >
+                    {live ? `${userPoints} pt prov.` : `+${userPoints} pts`}
                   </span>
                 )}
               </span>
@@ -158,7 +194,7 @@ export function MatchCardInteractive({
             )}
             <Link
               href={`/matches/${match.id}`}
-              className="flex items-center gap-0.5 text-[var(--color-muted)] hover:text-[var(--color-cream)]"
+              className="flex shrink-0 items-center gap-0.5 text-[var(--color-muted)] hover:text-[var(--color-cream)]"
             >
               Détails <ChevronRight className="size-3.5" />
             </Link>
@@ -233,10 +269,12 @@ function ReadOnlyRow({
   flag,
   name,
   score,
+  live = false,
 }: {
   flag: string;
   name: string;
   score?: number;
+  live?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between">
@@ -245,7 +283,12 @@ function ReadOnlyRow({
         <span className="truncate text-sm font-medium">{name}</span>
       </div>
       {score !== undefined && (
-        <span className="font-[family-name:var(--font-display)] text-xl font-bold tabular-nums">
+        <span
+          className={cn(
+            "font-[family-name:var(--font-display)] text-xl font-bold tabular-nums",
+            live && "text-red-400"
+          )}
+        >
           {score}
         </span>
       )}

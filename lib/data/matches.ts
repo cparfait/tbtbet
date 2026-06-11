@@ -38,6 +38,8 @@ export type Match = {
   group: string | null;
   matchday: number | null;
   result?: { homeScore: number; awayScore: number; status: "FINISHED" };
+  /** Score en direct (match en cours) — non crédité tant que pas terminé. */
+  live?: { homeScore: number; awayScore: number };
 };
 
 /** Ligne de classement d'un groupe. */
@@ -62,6 +64,23 @@ export type LeaderboardEntry = {
   exactScores: number;
   correctResults: number;
   badges: string[];
+};
+
+/** Entrée du classement LIVE (points acquis + points provisoires en cours). */
+export type LiveLeaderboardEntry = {
+  rank: number;
+  name: string;
+  email: string;
+  /** Points déjà acquis (matchs terminés). */
+  points: number;
+  /** Points provisoires des matchs en cours. */
+  livePoints: number;
+  /** points + livePoints. */
+  total: number;
+  exactScores: number;
+  badges: string[];
+  /** Évolution de rang vs match précédent (positif = monte), null si inconnu. */
+  evolution: number | null;
 };
 
 /** Statistiques agrégées d'un joueur (page profil). */

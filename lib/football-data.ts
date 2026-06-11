@@ -235,6 +235,46 @@ export async function syncMatches(
 }
 
 /**
+ * Fige le classement courant (rang de chaque joueur) dans `Score.previousRank`.
+ * Appelé juste AVANT de créditer les points d'un match qui se termine, pour
+ * pouvoir afficher l'évolution ▲▼ par rapport au match précédent.
+ */
+async function snapshotRanks(): Promise<void> {
+  const users = await prisma.user.findMany({
+    where: { banned: false },
+    select: {
+      id: true,
+      score: {
+        select: { points: true, exactScores: true, correctResults: true },
+      },
+    },
+  });
+
+  const ordered = users
+    .map((u) => ({
+      userId: u.id,
+      hasScore: u.score != null,
+      points: u.score?.points ?? 0,
+      exact: u.score?.exactScores ?? 0,
+      correct: u.score?.correctResults ?? 0,
+    }))
+    .sort(
+      (a, b) => b.points - a.points || b.exact - a.exact || b.correct - a.correct
+    );
+
+  let rank = 1;
+  for (const o of ordered) {
+    if (o.hasScore) {
+      await prisma.score.update({
+        where: { userId: o.userId },
+        data: { previousRank: rank },
+      });
+    }
+    rank++;
+  }
+}
+
+/**
  * Indique s'il y a une fenêtre de match « active » (un match dont le coup
  * d'envoi est imminent ou qui est probablement en cours), d'après les
  * horaires en base — SANS appeler l'API. Sert à décider de la fréquence de
@@ -265,14 +305,20 @@ export async function applyMatchResult(
   homeScore: number,
   awayScore: number
 ): Promise<{ scored: number }> {
+  const preds = await prisma.prediction.findMany({
+    where: { matchId, pointsAwarded: null },
+  });
+
+  // Si ce match va effectivement créditer des points, on fige d'abord le
+  // classement actuel (= rang AVANT ce match) pour les flèches d'évolution.
+  if (preds.length > 0) {
+    await snapshotRanks();
+  }
+
   await prisma.result.upsert({
     where: { matchId },
     update: { homeScore, awayScore, status: "FINISHED" },
     create: { matchId, homeScore, awayScore, status: "FINISHED" },
-  });
-
-  const preds = await prisma.prediction.findMany({
-    where: { matchId, pointsAwarded: null },
   });
 
   for (const pred of preds) {
