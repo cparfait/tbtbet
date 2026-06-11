@@ -1,0 +1,94 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# DaronsFC — Portainer Stack
+# ──────────────────────────────────────────────────────────────────────────────
+# Serveur : /home/apache/daronscup
+# Exposition : port 8895 → NPM → https://foot.cparfait.ovh
+#
+# Déploiement dans Portainer :
+#   1. Stacks → Add stack → nom : daronsfc
+#   2. Méthode : Web editor → coller ce contenu
+#   3. Onglet "Env" : remplir les variables
+#   4. Deploy the stack
+#
+# Build initial (SSH sur le serveur) :
+#   cd /home/apache/daronscup && docker build -t daronsfc_app:latest .
+#
+# Variables à définir dans Portainer (onglet Env) :
+#   AUTH_SECRET          = openssl rand -base64 32
+#   NEXTAUTH_URL         = https://foot.cparfait.ovh
+#   AUTH_GOOGLE_ID       = (ton Google Client ID)
+#   AUTH_GOOGLE_SECRET   = (ton Google Client Secret)
+#   FOOTBALL_DATA_TOKEN  = (ton token football-data.org)
+#   POSTGRES_PASSWORD    = (mot de passe sécurisé)
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: daronsfc_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-daronsfc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-daronsfc_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-daronsfc}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - daronsfc_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-daronsfc}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  migrate:
+    image: daronsfc_app:latest
+    container_name: daronsfc_migrate
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        npx prisma db push --skip-generate
+        && echo 'Migration terminée'
+      "
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-daronsfc}:${POSTGRES_PASSWORD:-daronsfc_secret}@db:5432/${POSTGRES_DB:-daronsfc}?schema=public"
+      DIRECT_URL: "postgresql://${POSTGRES_USER:-daronsfc}:${POSTGRES_PASSWORD:-daronsfc_secret}@db:5432/${POSTGRES_DB:-daronsfc}?schema=public"
+    networks:
+      - daronsfc_net
+
+  app:
+    image: daronsfc_app:latest
+    container_name: daronsfc_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "8895:3000"
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-daronsfc}:${POSTGRES_PASSWORD:-daronsfc_secret}@db:5432/${POSTGRES_DB:-daronsfc}?schema=public"
+      DIRECT_URL: "postgresql://${POSTGRES_USER:-daronsfc}:${POSTGRES_PASSWORD:-daronsfc_secret}@db:5432/${POSTGRES_DB:-daronsfc}?schema=public"
+      AUTH_SECRET: "${AUTH_SECRET}"
+      NEXTAUTH_URL: "${NEXTAUTH_URL:-https://foot.cparfait.ovh}"
+      AUTH_GOOGLE_ID: "${AUTH_GOOGLE_ID:-}"
+      AUTH_GOOGLE_SECRET: "${AUTH_GOOGLE_SECRET:-}"
+      FOOTBALL_DATA_TOKEN: "${FOOTBALL_DATA_TOKEN:-}"
+      FOOTBALL_DATA_COMPETITION: "${FOOTBALL_DATA_COMPETITION:-WC}"
+      NODE_ENV: production
+    networks:
+      - daronsfc_net
+
+networks:
+  daronsfc_net:
+    driver: bridge
+
+volumes:
+  pgdata:
+    name: daronsfc_pgdata
