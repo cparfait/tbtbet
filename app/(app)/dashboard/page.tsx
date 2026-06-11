@@ -143,7 +143,7 @@ export default async function DashboardPage() {
                     </span>
                   ) : featuredMatch.result ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-surface-2)] px-3 py-1 text-xs font-semibold text-[var(--color-muted)]">
-                      Termin\u00e9
+                      Terminé
                     </span>
                   ) : new Date(featuredMatch.kickoffAt) <= new Date() ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-3 py-1 text-xs font-bold uppercase tracking-wider text-red-400">
