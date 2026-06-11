@@ -2,7 +2,9 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci
+# --ignore-scripts : évite que postinstall (prisma generate) tourne ici
+# sans le schéma prisma. Le generate se fait dans le stage builder.
+RUN npm ci --ignore-scripts
 
 # ─── Stage 2 : build ──────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder
