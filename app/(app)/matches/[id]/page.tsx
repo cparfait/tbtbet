@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Lock, Trophy, Sparkles } from "lucide-react";
+import { ArrowLeft, Trophy, Radio, Users } from "lucide-react";
 import { CountdownTimer } from "@/components/countdown-timer";
 import { PredictionForm } from "@/components/prediction-form";
+import { MatchPredictions } from "@/components/match-predictions";
+import { LiveRefresher } from "@/components/live-refresher";
 import { Flag } from "@/components/flag";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getMatch } from "@/lib/data/queries";
-import { STAGE_LABELS } from "@/lib/data/matches";
+import { getMatch, getMatchPredictions } from "@/lib/data/queries";
+import { STAGE_LABELS, type MatchPrediction } from "@/lib/data/matches";
 import { jokerPhase, stagesOfPhase, jokerBudget } from "@/lib/jokers";
 import { formatKickoff } from "@/lib/utils";
 
@@ -61,10 +63,19 @@ export default async function MatchDetailPage({
   const kickoff = new Date(match.kickoffAt);
   const locked = Date.now() >= kickoff.getTime();
   const finished = match.result?.status === "FINISHED";
+  const live = match.live;
   const group = match.group ? `Groupe ${match.group}` : STAGE_LABELS[match.stage];
+
+  // Après le coup d'envoi : les pronos de TOUS les joueurs deviennent publics.
+  let predictions: MatchPrediction[] = [];
+  if (locked) {
+    predictions = await getMatchPredictions(id);
+  }
 
   return (
     <>
+      {live && <LiveRefresher seconds={30} />}
+
       {/* ── Back link ── */}
       <Link
         href="/matches"
@@ -99,18 +110,22 @@ export default async function MatchDetailPage({
               </span>
             </div>
 
-            {/* Score or VS */}
+            {/* Score (final / live) or VS */}
             <div className="flex flex-col items-center gap-1">
-              {finished ? (
+              {finished || live ? (
                 <div className="flex items-baseline gap-2">
-                  <span className="font-[family-name:var(--font-display)] text-5xl font-extrabold tabular-nums text-gradient-gold sm:text-6xl">
-                    {match.result!.homeScore}
+                  <span
+                    className={`font-[family-name:var(--font-display)] text-5xl font-extrabold tabular-nums sm:text-6xl ${live ? "text-red-400" : "text-gradient-gold"}`}
+                  >
+                    {(match.result ?? live)!.homeScore}
                   </span>
                   <span className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--color-muted)]">
                     &ndash;
                   </span>
-                  <span className="font-[family-name:var(--font-display)] text-5xl font-extrabold tabular-nums text-gradient-gold sm:text-6xl">
-                    {match.result!.awayScore}
+                  <span
+                    className={`font-[family-name:var(--font-display)] text-5xl font-extrabold tabular-nums sm:text-6xl ${live ? "text-red-400" : "text-gradient-gold"}`}
+                  >
+                    {(match.result ?? live)!.awayScore}
                   </span>
                 </div>
               ) : (
@@ -138,9 +153,18 @@ export default async function MatchDetailPage({
               {formatKickoff(kickoff)}
             </span>
 
-            {!finished && (
+            {!locked && (
               <div className="glass mt-1 rounded-2xl px-6 py-3">
                 <CountdownTimer target={kickoff} />
+              </div>
+            )}
+
+            {(live || (locked && !finished)) && (
+              <div className="mt-1 inline-flex items-center gap-2 rounded-full bg-red-500/15 px-4 py-1.5">
+                <Radio className="size-3.5 animate-pulse text-red-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-red-400">
+                  {live ? "En direct" : "En cours"}
+                </span>
               </div>
             )}
 
@@ -160,79 +184,32 @@ export default async function MatchDetailPage({
         </div>
       </div>
 
-      {/* ── Prediction / Result section ── */}
+      {/* ── Prediction / Predictions section ── */}
       <section className="mt-8">
         <div className="mb-4 flex items-center gap-3">
           <div className="h-5 w-1 rounded-full bg-[var(--color-gold)]" />
-          <h2 className="font-[family-name:var(--font-display)] text-lg font-bold">
-            {finished ? "Résultat" : "Ton pronostic"}
+          <h2 className="flex items-center gap-2 font-[family-name:var(--font-display)] text-lg font-bold">
+            {locked ? (
+              <>
+                <Users className="size-4 text-[var(--color-muted)]" />
+                Pronos des joueurs
+                {predictions.length > 0 && (
+                  <span className="font-[family-name:var(--font-mono)] text-sm font-normal text-[var(--color-muted)]">
+                    ({predictions.length})
+                  </span>
+                )}
+              </>
+            ) : (
+              "Ton pronostic"
+            )}
           </h2>
         </div>
 
-        {finished ? (
-          /* ── Finished match: result + user prediction ── */
-          <div className="glass-strong overflow-hidden rounded-2xl">
-            <div className="border-b border-[var(--color-border-subtle)] bg-[var(--color-gold)]/5 px-5 py-4">
-              <div className="flex items-center justify-center gap-3">
-                <Flag code={match.homeFlag} className="h-6 w-9" />
-                <span className="font-[family-name:var(--font-display)] text-2xl font-extrabold tabular-nums text-gradient-gold">
-                  {match.result!.homeScore} - {match.result!.awayScore}
-                </span>
-                <Flag code={match.awayFlag} className="h-6 w-9" />
-              </div>
-            </div>
-            <div className="p-5">
-              {existing ? (
-                <div className="flex items-center gap-3">
-                  <Sparkles className="size-4 shrink-0 text-[var(--color-gold)]" />
-                  <span className="text-sm text-[var(--color-muted)]">
-                    Ton prono :{" "}
-                    <span className="font-[family-name:var(--font-display)] font-bold text-[var(--color-cream)]">
-                      {existing.homeScore} - {existing.awayScore}
-                    </span>
-                    {existing.joker && (
-                      <span className="ml-2" title="Joker activé">🃏</span>
-                    )}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
-                  <Sparkles className="size-4 text-[var(--color-gold)]" />
-                  <span>Tu n&apos;avais pas pronostiqué ce match.</span>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : locked ? (
-          /* ── Locked: kickoff passed — affiche le prono si existant ── */
-          <div className="space-y-3">
-            <div className="glass-strong flex items-center gap-4 rounded-2xl p-5">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[var(--color-surface-2)]">
-                <Lock className="size-5 text-[var(--color-muted)]" />
-              </div>
-              <div>
-                <p className="font-[family-name:var(--font-display)] text-sm font-bold">
-                  Pronostics fermés
-                </p>
-                <p className="mt-0.5 text-xs text-[var(--color-muted)]">
-                  Le coup d&apos;envoi est passé, les pronos sont verrouillés.
-                </p>
-              </div>
-            </div>
-            {existing && (
-              <div className="glass rounded-2xl px-5 py-4">
-                <p className="text-sm text-[var(--color-muted)]">
-                  Ton prono :{" "}
-                  <span className="font-[family-name:var(--font-display)] font-bold text-[var(--color-cream)]">
-                    {existing.homeScore} - {existing.awayScore}
-                  </span>
-                  {existing.joker && (
-                    <span className="ml-2" title="Joker activé">🃏</span>
-                  )}
-                </p>
-              </div>
-            )}
-          </div>
+        {locked ? (
+          <MatchPredictions
+            predictions={predictions}
+            currentUserId={session?.user?.id}
+          />
         ) : (
           /* ── Open: show prediction form ── */
           <PredictionForm

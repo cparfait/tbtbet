@@ -13,6 +13,7 @@ import type {
   StandingTeam,
   LeaderboardEntry,
   LiveLeaderboardEntry,
+  MatchPrediction,
   BadgeDef,
   UserPrediction,
   UserStats,
@@ -249,6 +250,55 @@ export async function getLiveLeaderboard(): Promise<{
     return { entries, hasLive: liveResults.length > 0 };
   } catch {
     return { entries: [], hasLive: false };
+  }
+}
+
+/**
+ * Pronostics de TOUS les joueurs sur un match, avec les points (définitifs si
+ * terminé, provisoires si en cours). À n'afficher qu'après le coup d'envoi
+ * (anti-influence). Triés par points décroissants.
+ */
+export async function getMatchPredictions(
+  matchId: string
+): Promise<MatchPrediction[]> {
+  try {
+    const [match, preds] = await Promise.all([
+      prisma.match.findUnique({
+        where: { id: matchId },
+        include: { result: true },
+      }),
+      prisma.prediction.findMany({
+        where: { matchId },
+        include: { user: { select: { id: true, name: true } } },
+        orderBy: { submittedAt: "asc" },
+      }),
+    ]);
+
+    const result = match?.result;
+    const scored =
+      result && (result.status === "FINISHED" || result.status === "LIVE");
+    const live = result?.status === "LIVE";
+
+    return preds
+      .map((p) => ({
+        userId: p.userId,
+        name: p.user.name ?? "Anonyme",
+        homeScore: p.homeScore,
+        awayScore: p.awayScore,
+        joker: p.joker,
+        comment: p.comment ?? undefined,
+        points: scored
+          ? computePoints(
+              { homeScore: p.homeScore, awayScore: p.awayScore },
+              { homeScore: result!.homeScore, awayScore: result!.awayScore },
+              p.joker
+            ).points
+          : null,
+        live: !!live,
+      }))
+      .sort((a, b) => (b.points ?? -1) - (a.points ?? -1));
+  } catch {
+    return [];
   }
 }
 

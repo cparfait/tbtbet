@@ -110,6 +110,20 @@ export type UserPrediction = {
   match: Match;
 };
 
+/** Pronostic d'un joueur sur un match donné (vue publique après coup d'envoi). */
+export type MatchPrediction = {
+  userId: string;
+  name: string;
+  homeScore: number;
+  awayScore: number;
+  joker: boolean;
+  comment?: string;
+  /** Points (définitifs si terminé, provisoires si en cours, null sinon). */
+  points: number | null;
+  /** true si les points sont provisoires (match en cours). */
+  live: boolean;
+};
+
 /** Message du tchat. */
 export type ChatMessage = {
   id: string;
