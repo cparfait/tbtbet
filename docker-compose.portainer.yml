@@ -10,12 +10,19 @@
 #   3. Onglet "Env" : remplir les variables
 #   4. Deploy the stack
 #
-# Build initial (SSH sur le serveur) :
-#   cd /home/apache/daronscup && docker build -t daronsfc_app:latest .
+# Image : ghcr.io/cparfait/daronscup:latest
+# → Mise à jour automatique via GitHub Actions sur chaque push sur `main`.
+# → Portainer webhook déclenche le pull + redémarrage.
+#
+# Pour rendre l'image publique (lecture sans token) :
+#   GitHub → Packages → daronscup → Package settings → Change visibility → Public
+# Sinon Portainer doit s'authentifier :
+#   Portainer → Registries → Add registry → GitHub (ghcr.io)
 #
 # Variables à définir dans Portainer (onglet Env) :
 #   AUTH_SECRET          = openssl rand -base64 32
-#   NEXTAUTH_URL         = https://foot.cparfait.ovh
+#   AUTH_URL             = https://foot.cparfait.ovh   ← NextAuth v5 (obligatoire)
+#   NEXTAUTH_URL         = https://foot.cparfait.ovh   ← compat NextAuth v4
 #   AUTH_GOOGLE_ID       = (ton Google Client ID)
 #   AUTH_GOOGLE_SECRET   = (ton Google Client Secret)
 #   FOOTBALL_DATA_TOKEN  = (ton token football-data.org)
@@ -44,7 +51,8 @@ services:
       start_period: 10s
 
   migrate:
-    image: daronsfc_app:latest
+    image: ghcr.io/cparfait/daronscup:latest
+    pull_policy: always
     container_name: daronsfc_migrate
     restart: "no"
     depends_on:
@@ -53,7 +61,8 @@ services:
     entrypoint: >
       sh -c "
         npx prisma db push --skip-generate
-        && echo 'Migration terminée'
+        && npx prisma db seed
+        && echo 'Migration + seed terminés'
       "
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-daronsfc}:${POSTGRES_PASSWORD:-daronsfc_secret}@db:5432/${POSTGRES_DB:-daronsfc}?schema=public"
@@ -62,7 +71,8 @@ services:
       - daronsfc_net
 
   app:
-    image: daronsfc_app:latest
+    image: ghcr.io/cparfait/daronscup:latest
+    pull_policy: always
     container_name: daronsfc_app
     restart: unless-stopped
     depends_on:
@@ -76,12 +86,19 @@ services:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-daronsfc}:${POSTGRES_PASSWORD:-daronsfc_secret}@db:5432/${POSTGRES_DB:-daronsfc}?schema=public"
       DIRECT_URL: "postgresql://${POSTGRES_USER:-daronsfc}:${POSTGRES_PASSWORD:-daronsfc_secret}@db:5432/${POSTGRES_DB:-daronsfc}?schema=public"
       AUTH_SECRET: "${AUTH_SECRET}"
+      AUTH_URL: "${AUTH_URL:-https://foot.cparfait.ovh}"
       NEXTAUTH_URL: "${NEXTAUTH_URL:-https://foot.cparfait.ovh}"
       AUTH_GOOGLE_ID: "${AUTH_GOOGLE_ID:-}"
       AUTH_GOOGLE_SECRET: "${AUTH_GOOGLE_SECRET:-}"
       FOOTBALL_DATA_TOKEN: "${FOOTBALL_DATA_TOKEN:-}"
       FOOTBALL_DATA_COMPETITION: "${FOOTBALL_DATA_COMPETITION:-WC}"
       NODE_ENV: production
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     networks:
       - daronsfc_net
 

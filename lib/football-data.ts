@@ -247,9 +247,101 @@ export async function syncMatches(
             correctResults: correctResult ? 1 : 0,
           },
         });
+        await checkAndAwardBadges(pred.userId);
       }
     }
   }
 
   return { matches: data.matches.length, results };
+}
+
+// ─────────────────────────────────────────────
+// Attribution automatique des badges
+// ─────────────────────────────────────────────
+
+async function checkAndAwardBadges(userId: string): Promise<void> {
+  const [score, existingBadges] = await Promise.all([
+    prisma.score.findUnique({ where: { userId } }),
+    prisma.userBadge.findMany({
+      where: { userId },
+      include: { badge: { select: { key: true } } },
+    }),
+  ]);
+
+  const hasBadge = new Set(existingBadges.map((b) => b.badge.key));
+  const toAward: string[] = [];
+
+  // ── sniper : 10 scores exacts au total ──
+  if (!hasBadge.has("sniper") && (score?.exactScores ?? 0) >= 10) {
+    toAward.push("sniper");
+  }
+
+  // ── nostradamus : 3 scores exacts consécutifs ──
+  if (!hasBadge.has("nostradamus")) {
+    const scoredPreds = await prisma.prediction.findMany({
+      where: { userId, pointsAwarded: { not: null } },
+      include: {
+        match: {
+          select: { kickoffAt: true },
+          include: { result: true },
+        },
+      },
+      orderBy: { match: { kickoffAt: "asc" } },
+    });
+
+    let consecutive = 0;
+    for (const p of scoredPreds) {
+      const r = p.match.result;
+      if (r && p.homeScore === r.homeScore && p.awayScore === r.awayScore) {
+        consecutive++;
+        if (consecutive >= 3) {
+          toAward.push("nostradamus");
+          break;
+        }
+      } else {
+        consecutive = 0;
+      }
+    }
+  }
+
+  // ── meme_pas_mal : 0 pt sur toutes les prédictions d'une même journée ──
+  if (!hasBadge.has("meme_pas_mal")) {
+    const allPreds = await prisma.prediction.findMany({
+      where: { userId },
+      include: { match: { select: { matchday: true, result: true } } },
+    });
+
+    const byMatchday = new Map<number, typeof allPreds>();
+    for (const p of allPreds) {
+      const day = p.match.matchday;
+      if (day == null) continue;
+      const list = byMatchday.get(day) ?? [];
+      list.push(p);
+      byMatchday.set(day, list);
+    }
+
+    for (const dayPreds of byMatchday.values()) {
+      // Journée avec au moins 2 pronostics, tous terminés et tous à 0 pt
+      if (
+        dayPreds.length >= 2 &&
+        dayPreds.every((p) => p.pointsAwarded !== null) &&
+        dayPreds.every((p) => p.pointsAwarded === 0)
+      ) {
+        toAward.push("meme_pas_mal");
+        break;
+      }
+    }
+  }
+
+  // ── Award ──
+  for (const key of toAward) {
+    const badge = await prisma.badge.findUnique({ where: { key } });
+    if (!badge) continue;
+    await prisma.userBadge.upsert({
+      where: { userId_badgeId: { userId, badgeId: badge.id } },
+      update: {},
+      create: { userId, badgeId: badge.id },
+    });
+    console.log(`[badges] 🎖️ "${key}" attribué à ${userId}`);
+  }
 }
