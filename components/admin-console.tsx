@@ -36,11 +36,65 @@ export function AdminConsole({
   return (
     <div className="grid gap-4">
       <SyncPanel />
+      <InvitePanel />
       <ImportPredictionPanel users={users} matches={allMatches} />
       <ManualScorePanel matches={matches} />
       <UsersPanel users={users} currentUserId={currentUserId} />
       <CloseTournamentPanel />
     </div>
+  );
+}
+
+/* ─── Génération d'un lien d'invitation ─── */
+function InvitePanel() {
+  const [pending, start] = useTransition();
+  const { msg, flash } = useFeedback();
+  const [link, setLink] = useState("");
+
+  const generate = () =>
+    start(async () => {
+      try {
+        const res = await fetch("/api/admin/invite", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Erreur");
+        const url = `${window.location.origin}/invite/${data.token}`;
+        setLink(url);
+        try {
+          await navigator.clipboard.writeText(url);
+          flash("✓ Lien copié dans le presse-papier", true);
+        } catch {
+          flash("Lien généré (copie manuelle)", true);
+        }
+      } catch (e) {
+        flash(e instanceof Error ? e.message : "Erreur", false);
+      }
+    });
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <CardTitle className="text-base">✉️ Inviter des joueurs</CardTitle>
+        <p className="mt-1 mb-3 text-sm text-[var(--color-muted)]">
+          Génère un lien à partager (20 usages, valable 30 jours).
+        </p>
+        <Button variant="primary" size="sm" onClick={generate} disabled={pending}>
+          {pending ? <Loader2 className="animate-spin" /> : <Check />}
+          Générer un lien
+        </Button>
+        {link && (
+          <p className="mt-2 break-all rounded-lg bg-[var(--color-surface-2)] p-2 font-[family-name:var(--font-mono)] text-xs text-[var(--color-pitch-bright)]">
+            {link}
+          </p>
+        )}
+        {msg && (
+          <p
+            className={`mt-2 text-sm ${msg.ok ? "text-[var(--color-pitch-bright)]" : "text-red-400"}`}
+          >
+            {msg.text}
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
