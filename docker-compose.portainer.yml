@@ -92,6 +92,9 @@ services:
       SYNC_IDLE_MINUTES: "${SYNC_IDLE_MINUTES:-30}"
       ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@daronsfc.fr}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: "${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}"
+      VAPID_PRIVATE_KEY: "${VAPID_PRIVATE_KEY:-}"
+      VAPID_SUBJECT: "${VAPID_SUBJECT:-mailto:admin@daronsfc.fr}"
       NODE_ENV: production
     healthcheck:
       test:

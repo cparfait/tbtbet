@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { CredentialsForm, GoogleSignInButton } from "@/components/auth-buttons";
+import { InAppBrowserNotice } from "@/components/in-app-browser-notice";
 
 export default async function LoginPage() {
   const session = await auth();
@@ -96,6 +97,9 @@ export default async function LoginPage() {
               Rejoins ta bande de darons et fais tes pronos.
             </p>
           </div>
+
+          {/* Avertissement navigateur intégré (Messenger, Instagram…) */}
+          <InAppBrowserNotice />
 
           {/* Google sign-in */}
           <GoogleSignInButton className="w-full" />

@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // bcryptjs est utilisé côté serveur (auth, bootstrap admin) — on évite de le
   // bundler (sinon webpack avertit qu'il ne résout pas 'crypto').
-  serverExternalPackages: ["bcryptjs"],
+  serverExternalPackages: ["bcryptjs", "web-push"],
   outputFileTracingIncludes: {
     "/**": ["./node_modules/.prisma/**/*", "./prisma/schema.prisma"],
   },

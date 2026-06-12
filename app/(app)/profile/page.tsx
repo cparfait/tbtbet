@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { SignOutButton } from "@/components/sign-out-button";
 import { EditableName } from "@/components/editable-name";
+import { PushToggle } from "@/components/push-toggle";
 import { Flag } from "@/components/flag";
 import {
   getBadges,
@@ -28,6 +29,9 @@ export default async function ProfilePage() {
   const session = await auth();
   const user = session?.user;
   const isAdmin = user?.role === "ADMIN";
+  // Clé VAPID publique lue au runtime (NEXT_PUBLIC_* est figé au build, on la
+  // passe donc en prop depuis le serveur pour qu'elle marche via Portainer).
+  const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
   let badges: BadgeDef[] = [];
   let stats: UserStats | null = null;
@@ -232,6 +236,11 @@ export default async function ProfilePage() {
             );
           })}
         </div>
+      </div>
+
+      {/* Notifications push */}
+      <div className="mb-3">
+        <PushToggle vapidKey={vapidKey} />
       </div>
 
       {/* Admin link */}

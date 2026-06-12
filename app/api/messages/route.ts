@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sendPushToAllExcept } from "@/lib/push";
 
 export async function GET(req: Request) {
   try {
@@ -64,6 +65,14 @@ export async function POST(req: Request) {
       data: { userId: session.user.id, content: text.slice(0, 500) },
       include: { user: { select: { id: true, name: true } } },
     });
+
+    // Notification push aux autres joueurs (fire-and-forget).
+    sendPushToAllExcept(session.user.id, {
+      title: msg.user.name ?? "Daron",
+      body: text.slice(0, 120),
+      url: "/chat",
+    }).catch(() => {});
+
     return NextResponse.json({
       id: msg.id,
       userId: msg.userId,
