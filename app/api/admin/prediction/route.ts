@@ -55,12 +55,26 @@ export async function POST(req: Request) {
   let scored = 0;
   const alreadyScored = existing != null && existing.pointsAwarded != null;
   if (match.result?.status === "FINISHED" && !alreadyScored) {
-    const r = await applyMatchResult(
-      matchId,
-      match.result.homeScore,
-      match.result.awayScore
-    );
-    scored = r.scored;
+    try {
+      const r = await applyMatchResult(
+        matchId,
+        match.result.homeScore,
+        match.result.awayScore
+      );
+      scored = r.scored;
+    } catch (e) {
+      // Le prono est sauvegardé ; seul le calcul des points a échoué.
+      console.error("[import] scoring échec:", e instanceof Error ? e.message : e);
+      return NextResponse.json(
+        {
+          ok: true,
+          scored: 0,
+          warning:
+            "Prono enregistré, mais l'attribution des points a échoué (voir logs serveur).",
+        },
+        { status: 200 }
+      );
+    }
   }
 
   return NextResponse.json({ ok: true, scored, alreadyScored });

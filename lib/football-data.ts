@@ -311,8 +311,14 @@ export async function applyMatchResult(
 
   // Si ce match va effectivement créditer des points, on fige d'abord le
   // classement actuel (= rang AVANT ce match) pour les flèches d'évolution.
+  // Défensif : un souci ici (ex. colonne previousRank absente) ne doit pas
+  // empêcher l'attribution des points.
   if (preds.length > 0) {
-    await snapshotRanks();
+    try {
+      await snapshotRanks();
+    } catch (e) {
+      console.error("[snapshotRanks] ignoré:", e instanceof Error ? e.message : e);
+    }
   }
 
   await prisma.result.upsert({

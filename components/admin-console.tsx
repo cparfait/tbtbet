@@ -340,14 +340,18 @@ function ImportPredictionPanel({
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Erreur");
-        flash(
-          data.scored > 0
-            ? "✓ Prono importé et crédité"
-            : data.alreadyScored
-              ? "✓ Prono mis à jour (points déjà comptés)"
-              : "✓ Prono importé",
-          true
-        );
+        if (data.warning) {
+          flash(data.warning, false);
+        } else {
+          flash(
+            data.scored > 0
+              ? "✓ Prono importé et crédité"
+              : data.alreadyScored
+                ? "✓ Prono mis à jour (points déjà comptés)"
+                : "✓ Prono importé",
+            true
+          );
+        }
         setHome("");
         setAway("");
         setJoker(false);
