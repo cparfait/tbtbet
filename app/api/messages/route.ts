@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { sendPushToAllExcept } from "@/lib/push";
+import { sendPushToUsers } from "@/lib/push";
+import { getActiveGroup, getGroupMemberIds } from "@/lib/groups";
 
 /** Agrège les réactions d'un message en { emoji, count, mine }. */
 function aggregateReactions(
@@ -22,10 +23,16 @@ export async function GET(req: Request) {
   try {
     const session = await auth();
     const meId = session?.user?.id;
+    if (!meId) return NextResponse.json([]);
+    const active = await getActiveGroup(meId);
+    if (!active) return NextResponse.json([]);
     const { searchParams } = new URL(req.url);
     const since = searchParams.get("since");
     const messages = await prisma.message.findMany({
-      where: since ? { createdAt: { gt: new Date(since) } } : {},
+      where: {
+        groupId: active.id,
+        ...(since ? { createdAt: { gt: new Date(since) } } : {}),
+      },
       include: {
         user: { select: { id: true, name: true } },
         reactions: { select: { emoji: true, userId: true } },
@@ -91,22 +98,37 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Non connecté" }, { status: 401 });
   }
   try {
+    const active = await getActiveGroup(session.user.id);
+    if (!active) {
+      return NextResponse.json({ error: "Aucun groupe actif" }, { status: 400 });
+    }
     const { content } = await req.json();
     const text = (content ?? "").trim();
     if (!text) {
       return NextResponse.json({ error: "Message vide" }, { status: 400 });
     }
     const msg = await prisma.message.create({
-      data: { userId: session.user.id, content: text.slice(0, 500) },
+      data: {
+        userId: session.user.id,
+        groupId: active.id,
+        content: text.slice(0, 500),
+      },
       include: { user: { select: { id: true, name: true } } },
     });
 
-    // Notification push aux autres joueurs (fire-and-forget).
-    sendPushToAllExcept(session.user.id, {
-      title: msg.user.name ?? "Daron",
-      body: text.slice(0, 120),
-      url: "/chat",
-    }).catch(() => {});
+    // Notification push aux membres du groupe (sauf l'auteur), fire-and-forget.
+    getGroupMemberIds(active.id)
+      .then((ids) =>
+        sendPushToUsers(
+          ids.filter((id) => id !== session.user!.id),
+          {
+            title: `${msg.user.name ?? "Daron"} · ${active.name}`,
+            body: text.slice(0, 120),
+            url: "/chat",
+          }
+        )
+      )
+      .catch(() => {});
 
     return NextResponse.json({
       id: msg.id,

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { redirect } from "next/navigation";
 import { ChevronRight, TrendingUp, Target, Trophy, Radio } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
@@ -8,12 +9,19 @@ import { Flag } from "@/components/flag";
 import { Card } from "@/components/ui/card";
 import { LiveRefresher } from "@/components/live-refresher";
 import { HomeOnboarding } from "@/components/home-onboarding";
+import { GroupSwitcher } from "@/components/group-switcher";
 import {
   getLiveLeaderboard,
   getMatches,
+  getMyPrediction,
   getUserStats,
 } from "@/lib/data/queries";
-import { cn } from "@/lib/utils";
+import {
+  getMyGroups,
+  getGroupMemberIds,
+  requireActiveGroup,
+} from "@/lib/groups";
+import { cn, formatKickoffTime } from "@/lib/utils";
 
 export const metadata = { title: "Hub \u00b7 DaronsFC" };
 export const dynamic = "force-dynamic";
@@ -22,17 +30,24 @@ const MEDALS = ["\u{1F947}", "\u{1F948}", "\u{1F949}"];
 
 export default async function DashboardPage() {
   const session = await auth();
-  const firstName = session?.user?.name?.split(" ")[0] ?? "Daron";
+  if (!session?.user?.id) redirect("/login");
+  const userId = session.user.id;
+  const firstName = session.user.name?.split(" ")[0] ?? "Daron";
   const now = Date.now();
+
+  // Groupe actif (redirige vers /groups si l'utilisateur n'en a aucun).
+  const activeGroup = await requireActiveGroup(userId);
+  const [myGroups, memberIds] = await Promise.all([
+    getMyGroups(userId),
+    getGroupMemberIds(activeGroup.id),
+  ]);
 
   const [matches, { entries: leaderboard, hasLive }] = await Promise.all([
     getMatches(),
-    getLiveLeaderboard(),
+    getLiveLeaderboard(memberIds),
   ]);
 
-  const stats = session?.user?.id
-    ? await getUserStats(session.user.id)
-    : null;
+  const stats = await getUserStats(userId);
 
   const TOP_3 = leaderboard.slice(0, 3).map((u, i) => ({
     name: u.name,
@@ -40,9 +55,7 @@ export default async function DashboardPage() {
     medal: MEDALS[i],
   }));
 
-  const myRank = session?.user?.id
-    ? leaderboard.find((u) => u.email === session.user?.email)?.rank
-    : undefined;
+  const myRank = leaderboard.find((u) => u.email === session.user?.email)?.rank;
 
   // Match « à la une » : priorité au direct, sinon prochain match, sinon dernier joué.
   const liveMatch = matches.find((m) => m.live);
@@ -66,6 +79,11 @@ export default async function DashboardPage() {
 
   const upcomingMatches = upcoming.slice(0, 3);
 
+  // Mon prono sur le match à la une (s'il existe).
+  const featuredPrediction = featuredMatch
+    ? await getMyPrediction(userId, featuredMatch.id)
+    : null;
+
   const avatar = session?.user?.image;
 
   return (
@@ -87,21 +105,30 @@ export default async function DashboardPage() {
         }
         subtitle={"Pr\u00eat \u00e0 pronostiquer ?"}
         action={
-          avatar ? (
-            <Image
-              src={avatar}
-              alt={firstName}
-              width={44}
-              height={44}
-              className="size-11 rounded-full object-cover ring-2 ring-[var(--color-pitch)]/30"
-            />
-          ) : (
-            <div className="flex size-11 items-center justify-center rounded-full bg-[var(--color-pitch)] text-lg font-bold ring-2 ring-[var(--color-pitch-bright)]/30">
-              {firstName.charAt(0).toUpperCase()}
-            </div>
-          )
+          <Link href="/profile" aria-label="Mon profil" className="block transition-transform hover:scale-105">
+            {avatar ? (
+              <Image
+                src={avatar}
+                alt={firstName}
+                width={44}
+                height={44}
+                className="size-11 rounded-full object-cover ring-2 ring-[var(--color-pitch)]/30"
+              />
+            ) : (
+              <div className="flex size-11 items-center justify-center rounded-full bg-[var(--color-pitch)] text-lg font-bold ring-2 ring-[var(--color-pitch-bright)]/30">
+                {firstName.charAt(0).toUpperCase()}
+              </div>
+            )}
+          </Link>
         }
       />
+
+      <div className="mb-5 flex items-center justify-between gap-2">
+        <span className="text-xs font-medium uppercase tracking-widest text-[var(--color-muted)]">
+          Groupe
+        </span>
+        <GroupSwitcher groups={myGroups} activeId={activeGroup.id} />
+      </div>
 
       <HomeOnboarding />
 
@@ -152,6 +179,11 @@ export default async function DashboardPage() {
                     {featuredMatch.group
                       ? "Groupe " + featuredMatch.group
                       : featuredMatch.stage}
+                    {!featuredStarted && (
+                      <span className="ml-2 text-[var(--color-cream)]/70">
+                        {formatKickoffTime(featuredMatch.kickoffAt)}
+                      </span>
+                    )}
                   </span>
                   {featuredMatch.live ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-3 py-1 text-xs font-bold uppercase tracking-wider text-red-400">
@@ -210,9 +242,27 @@ export default async function DashboardPage() {
                   </div>
                 </div>
 
+                {featuredPrediction && (
+                  <div className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-[var(--color-gold)]/20 bg-[var(--color-gold)]/[0.06] py-2 text-sm">
+                    <span className="text-[var(--color-muted)]">Ton prono</span>
+                    <span className="font-[family-name:var(--font-mono)] font-bold text-[var(--color-gold)]">
+                      {featuredPrediction.homeScore} – {featuredPrediction.awayScore}
+                    </span>
+                    {featuredPrediction.joker && (
+                      <span className="rounded bg-[var(--color-gold)]/15 px-1.5 py-0.5 text-xs font-bold text-[var(--color-gold)]">
+                        JOKER ×2
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <div className="mt-5 flex justify-center">
                   <span className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[var(--color-pitch)] to-[var(--color-pitch-bright)] px-6 py-2.5 font-[family-name:var(--font-display)] text-sm font-bold uppercase tracking-wide text-white shadow-lg shadow-[var(--color-pitch)]/25 transition-transform hover:scale-105">
-                    {featuredStarted ? "Voir les pronos" : "Pronostiquer"}
+                    {featuredStarted
+                      ? "Voir les pronos"
+                      : featuredPrediction
+                        ? "Modifier mon prono"
+                        : "Pronostiquer"}
                     <ChevronRight className="size-4" />
                   </span>
                 </div>

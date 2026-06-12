@@ -1,10 +1,18 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowUp, ArrowDown, Minus, Radio, ChevronRight } from "lucide-react";
+import { auth } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { LiveRefresher } from "@/components/live-refresher";
+import { GroupSwitcher } from "@/components/group-switcher";
 import { cn } from "@/lib/utils";
 import { getLiveLeaderboard, getBadges } from "@/lib/data/queries";
+import {
+  getMyGroups,
+  getGroupMemberIds,
+  requireActiveGroup,
+} from "@/lib/groups";
 
 export const metadata = { title: "Classement · DaronsFC" };
 export const dynamic = "force-dynamic";
@@ -12,8 +20,18 @@ export const dynamic = "force-dynamic";
 const MEDALS = ["\u{1F947}", "\u{1F948}", "\u{1F949}"];
 
 export default async function LeaderboardPage() {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+  const userId = session.user.id;
+
+  const activeGroup = await requireActiveGroup(userId);
+  const [myGroups, memberIds] = await Promise.all([
+    getMyGroups(userId),
+    getGroupMemberIds(activeGroup.id),
+  ]);
+
   const [{ entries, hasLive }, badges] = await Promise.all([
-    getLiveLeaderboard(),
+    getLiveLeaderboard(memberIds),
     getBadges(),
   ]);
   const top3 = entries.slice(0, 3);
@@ -27,7 +45,7 @@ export default async function LeaderboardPage() {
 
       <PageHeader
         title="Classement"
-        subtitle="La bande des darons"
+        subtitle={activeGroup.name}
         action={
           hasLive ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-red-400">
@@ -37,6 +55,13 @@ export default async function LeaderboardPage() {
           ) : undefined
         }
       />
+
+      <div className="mb-5 flex items-center justify-between gap-2">
+        <span className="text-xs font-medium uppercase tracking-widest text-[var(--color-muted)]">
+          Groupe
+        </span>
+        <GroupSwitcher groups={myGroups} activeId={activeGroup.id} />
+      </div>
 
       {entries.length === 0 && (
         <Card className="glass mt-4 p-8 text-center">

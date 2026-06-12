@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { RegisterForm } from "@/components/auth-buttons";
@@ -70,23 +71,16 @@ export default async function RegisterPage() {
 
           {/* Header */}
           <div className="mb-8">
-            {/* Logo accent */}
-            <div className="mb-4 flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-gold)]/10">
-                <svg
-                  className="size-5 text-[var(--color-gold-bright)]"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z"
-                  />
-                </svg>
-              </div>
+            {/* Logo */}
+            <div className="mb-5">
+              <Image
+                src="/logo.png"
+                alt="DaronsFC"
+                width={80}
+                height={80}
+                priority
+                className="rounded-2xl shadow-lg shadow-[var(--color-gold)]/20 ring-1 ring-white/10"
+              />
             </div>
 
             <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-cream)]">

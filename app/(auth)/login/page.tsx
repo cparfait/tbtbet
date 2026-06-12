@@ -1,12 +1,26 @@
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { CredentialsForm, GoogleSignInButton } from "@/components/auth-buttons";
 import { InAppBrowserNotice } from "@/components/in-app-browser-notice";
 
-export default async function LoginPage() {
+/** Garde-fou : n'autorise que des chemins internes (anti open-redirect). */
+function safeNext(next?: string): string {
+  return next && next.startsWith("/") && !next.startsWith("//")
+    ? next
+    : "/dashboard";
+}
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
+  const dest = safeNext(next);
   const session = await auth();
-  if (session?.user) redirect("/dashboard");
+  if (session?.user) redirect(dest);
 
   return (
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4 py-8">
@@ -71,23 +85,16 @@ export default async function LoginPage() {
 
           {/* Header */}
           <div className="mb-8">
-            {/* Logo accent */}
-            <div className="mb-4 flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-pitch)]/10">
-                <svg
-                  className="size-5 text-[var(--color-pitch-bright)]"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 0v4m0 12v4m8-10h4M0 12h4m13.66-5.66 2.83-2.83M3.51 20.49l2.83-2.83m0-11.32L3.51 3.51m16.98 16.98-2.83-2.83"
-                  />
-                </svg>
-              </div>
+            {/* Logo */}
+            <div className="mb-5">
+              <Image
+                src="/logo.png"
+                alt="DaronsFC"
+                width={80}
+                height={80}
+                priority
+                className="rounded-2xl shadow-lg shadow-[var(--color-pitch)]/20 ring-1 ring-white/10"
+              />
             </div>
 
             <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-cream)]">
@@ -102,7 +109,7 @@ export default async function LoginPage() {
           <InAppBrowserNotice />
 
           {/* Google sign-in */}
-          <GoogleSignInButton className="w-full" />
+          <GoogleSignInButton className="w-full" callbackUrl={dest} />
 
           {/* Divider */}
           <div className="my-6 flex items-center gap-3">
@@ -114,7 +121,7 @@ export default async function LoginPage() {
           </div>
 
           {/* Credentials form */}
-          <CredentialsForm />
+          <CredentialsForm next={dest} />
 
           {/* Register link */}
           <p className="mt-6 text-center text-sm text-[var(--color-muted)]">

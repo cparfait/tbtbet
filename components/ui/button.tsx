@@ -10,6 +10,8 @@ const buttonVariants = cva(
         primary:
           "bg-[var(--color-pitch)] text-white hover:bg-[var(--color-pitch-bright)] shadow-lg shadow-[var(--color-pitch)]/20",
         gold: "bg-[var(--color-gold)] text-black font-semibold hover:brightness-110",
+        danger:
+          "bg-red-500/90 text-white font-semibold hover:bg-red-500 shadow-lg shadow-red-500/20",
         outline:
           "border border-[var(--color-border-subtle)] bg-transparent text-[var(--color-cream)] hover:bg-[var(--color-surface-2)]",
         ghost:

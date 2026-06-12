@@ -19,6 +19,7 @@ export const authConfig = {
         publicPaths.includes(nextUrl.pathname) ||
         nextUrl.pathname.startsWith("/api/auth") ||
         nextUrl.pathname.startsWith("/invite") ||
+        nextUrl.pathname.startsWith("/join") ||
         nextUrl.pathname.startsWith("/api/register");
 
       if (isPublic) return true;

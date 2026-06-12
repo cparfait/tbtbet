@@ -35,9 +35,36 @@ model User {
   badges        UserBadge[]
   pushSubs      PushSubscription[]
   score         Score?
+  groupMemberships GroupMember[]
 
   accounts      Account[]
   sessions      Session[]
+}
+
+// ─────────────────────────────────────────────
+// Groupes d'amis
+// ─────────────────────────────────────────────
+
+model Group {
+  id        String        @id @default(cuid())
+  name      String
+  token     String        @unique // lien d'invitation unique et stable
+  createdBy String
+  createdAt DateTime      @default(now())
+  members   GroupMember[]
+  messages  Message[]
+}
+
+model GroupMember {
+  groupId  String
+  userId   String
+  role     GroupRole @default(MEMBER)
+  joinedAt DateTime  @default(now())
+  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@index([userId])
 }
 
 model Match {
@@ -97,13 +124,16 @@ model Score {
 model Message {
   id        String     @id @default(cuid())
   userId    String
+  groupId   String? // tchat propre à un groupe (null = ancien tchat global)
   content   String
   pinned    Boolean    @default(false)
   createdAt DateTime   @default(now())
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group     Group?     @relation(fields: [groupId], references: [id], onDelete: Cascade)
   reactions Reaction[]
 
   @@index([createdAt])
+  @@index([groupId, createdAt])
 }
 
 model Reaction {
@@ -200,6 +230,11 @@ model VerificationToken {
 enum Role {
   USER
   ADMIN
+}
+
+enum GroupRole {
+  OWNER
+  MEMBER
 }
 
 enum Stage {

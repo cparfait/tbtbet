@@ -42,7 +42,63 @@ export function AdminConsole({
       <ManualScorePanel matches={matches} />
       <UsersPanel users={users} currentUserId={currentUserId} />
       <CloseTournamentPanel />
+      <ResetPanel />
     </div>
+  );
+}
+
+/* ─── Remise à zéro (zone dangereuse) ─── */
+function ResetPanel() {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const { msg, flash } = useFeedback();
+
+  const reset = () =>
+    start(async () => {
+      if (
+        !confirm(
+          "⚠️ REMISE À ZÉRO\n\nEfface TOUS les pronos, résultats, scores, messages et badges.\nLes comptes, les matchs et les groupes sont conservés.\n\nContinuer ?"
+        )
+      )
+        return;
+      if (!confirm("Dernière confirmation : cette action est IRRÉVERSIBLE. Tout effacer ?"))
+        return;
+      try {
+        const res = await fetch("/api/admin/reset", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Erreur");
+        flash(
+          `✓ Remis à zéro : ${data.predictions} pronos, ${data.results} résultats, ${data.messages} messages effacés.`,
+          true
+        );
+        router.refresh();
+      } catch (e) {
+        flash(e instanceof Error ? e.message : "Erreur", false);
+      }
+    });
+
+  return (
+    <Card className="border-red-500/30 bg-red-500/[0.04]">
+      <CardContent className="p-4">
+        <CardTitle className="text-base text-red-400">🧨 Remise à zéro</CardTitle>
+        <p className="mt-1 mb-3 text-sm text-[var(--color-muted)]">
+          Repart à 0 une fois les tests finis : efface pronos, résultats, scores,
+          messages et badges. <strong className="text-[var(--color-cream)]">Conserve</strong> les
+          comptes, les matchs et les groupes.
+        </p>
+        <Button variant="danger" size="sm" onClick={reset} disabled={pending}>
+          {pending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+          Tout remettre à zéro
+        </Button>
+        {msg && (
+          <p
+            className={`mt-2 text-sm ${msg.ok ? "text-[var(--color-pitch-bright)]" : "text-red-400"}`}
+          >
+            {msg.text}
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

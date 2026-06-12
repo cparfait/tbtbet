@@ -7,7 +7,7 @@ import { Minus, Plus, Check, Loader2, Lock, ChevronRight, Radio } from "lucide-r
 import { CountdownTimer } from "./countdown-timer";
 import { Card } from "./ui/card";
 import { Flag } from "./flag";
-import { cn } from "@/lib/utils";
+import { cn, formatKickoffTime } from "@/lib/utils";
 import { computePoints } from "@/lib/scoring";
 import { STAGE_LABELS, type Match } from "@/lib/data/matches";
 
@@ -129,7 +129,12 @@ export function MatchCardInteractive({
     <Card className="p-4">
       {/* En-tête : phase + compte à rebours / statut */}
       <div className="mb-3 flex items-center justify-between text-xs text-[var(--color-muted)]">
-        <span className="font-[family-name:var(--font-mono)]">{group}</span>
+        <span className="font-[family-name:var(--font-mono)]">
+          {group}
+          <span className="ml-2 text-[var(--color-cream)]/70">
+            {formatKickoffTime(match.kickoffAt)}
+          </span>
+        </span>
         {finished ? (
           <span className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 font-semibold uppercase tracking-wider">
             Terminé

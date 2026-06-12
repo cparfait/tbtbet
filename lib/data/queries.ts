@@ -155,10 +155,16 @@ export async function getStandings(): Promise<Record<string, StandingTeam[]>> {
  * notamment les comptes Google qui n'ont pas de ligne `Score` à l'inscription).
  * Les bannis sont exclus.
  */
-export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
+export async function getLeaderboard(
+  memberIds?: string[]
+): Promise<LeaderboardEntry[]> {
   try {
+    if (memberIds && memberIds.length === 0) return [];
     const users = await prisma.user.findMany({
-      where: { banned: false },
+      where: {
+        banned: false,
+        ...(memberIds ? { id: { in: memberIds } } : {}),
+      },
       include: {
         score: true,
         badges: { include: { badge: true } },
@@ -192,14 +198,18 @@ export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
  * (statut LIVE), recalculés à la volée. Renvoie aussi l'évolution ▲▼ de
  * chaque joueur (vs le dernier match terminé) et un drapeau `hasLive`.
  */
-export async function getLiveLeaderboard(): Promise<{
+export async function getLiveLeaderboard(memberIds?: string[]): Promise<{
   entries: LiveLeaderboardEntry[];
   hasLive: boolean;
 }> {
   try {
+    if (memberIds && memberIds.length === 0) return { entries: [], hasLive: false };
     const [users, liveResults] = await Promise.all([
       prisma.user.findMany({
-        where: { banned: false },
+        where: {
+          banned: false,
+          ...(memberIds ? { id: { in: memberIds } } : {}),
+        },
         include: { score: true, badges: { include: { badge: true } } },
       }),
       prisma.result.findMany({
@@ -364,6 +374,22 @@ export async function getPredictionComparison(
     });
 
     return { targetName: target.name ?? "Anonyme", rows };
+  } catch {
+    return null;
+  }
+}
+
+/** Pronostic de l'utilisateur sur un match précis (ou null). */
+export async function getMyPrediction(
+  userId: string,
+  matchId: string
+): Promise<{ homeScore: number; awayScore: number; joker: boolean } | null> {
+  try {
+    const p = await prisma.prediction.findUnique({
+      where: { userId_matchId: { userId, matchId } },
+      select: { homeScore: true, awayScore: true, joker: true },
+    });
+    return p;
   } catch {
     return null;
   }

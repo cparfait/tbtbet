@@ -3,8 +3,17 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Loader2, Mail, Lock, Eye, EyeOff, User, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  Loader2,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  User,
+  AlertCircle,
+  ArrowRight,
+  Sparkles,
+} from "lucide-react";
 
 /* ────────────────────────────────────────────
    Shared styles
@@ -49,9 +58,11 @@ function GoogleIcon() {
 export function GoogleSignInButton({
   className,
   label = "Continuer avec Google",
+  callbackUrl = "/dashboard",
 }: {
   className?: string;
   label?: string;
+  callbackUrl?: string;
 }) {
   const [loading, setLoading] = useState(false);
 
@@ -61,7 +72,7 @@ export function GoogleSignInButton({
       disabled={loading}
       onClick={() => {
         setLoading(true);
-        signIn("google", { callbackUrl: "/dashboard" });
+        signIn("google", { callbackUrl });
       }}
       className={
         `group relative flex h-12 w-full items-center justify-center gap-3 rounded-xl
@@ -86,7 +97,7 @@ export function GoogleSignInButton({
    CredentialsForm (Login)
    ──────────────────────────────────────────── */
 
-export function CredentialsForm() {
+export function CredentialsForm({ next = "/dashboard" }: { next?: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -109,7 +120,7 @@ export function CredentialsForm() {
     if (res?.error) {
       setError("Email ou mot de passe incorrect.");
     } else {
-      router.push("/dashboard");
+      router.push(next);
       router.refresh();
     }
   }
@@ -160,21 +171,25 @@ export function CredentialsForm() {
       )}
 
       {/* Submit */}
-      <Button
+      <button
         type="submit"
-        size="lg"
         disabled={loading}
-        className="mt-1 h-12 w-full rounded-xl bg-[var(--color-pitch)] text-white font-semibold transition-all duration-200 hover:bg-[var(--color-pitch-bright)] hover:shadow-lg hover:shadow-[var(--color-pitch)]/25 active:scale-[0.98] disabled:opacity-60"
+        className="group relative mt-1 flex h-14 w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-[var(--color-pitch)] to-[var(--color-pitch-bright)] text-base font-bold uppercase tracking-wide text-white shadow-lg shadow-[var(--color-pitch)]/30 transition-all duration-200 hover:shadow-xl hover:shadow-[var(--color-pitch)]/45 hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
       >
+        {/* Reflet animé au survol */}
+        <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
         {loading ? (
-          <span className="flex items-center gap-2">
-            <Loader2 className="size-4 animate-spin" />
+          <>
+            <Loader2 className="size-5 animate-spin" />
             Connexion en cours...
-          </span>
+          </>
         ) : (
-          "Se connecter"
+          <>
+            Se connecter
+            <ArrowRight className="size-5 transition-transform duration-200 group-hover:translate-x-1" />
+          </>
         )}
-      </Button>
+      </button>
     </form>
   );
 }
@@ -183,7 +198,13 @@ export function CredentialsForm() {
    RegisterForm
    ──────────────────────────────────────────── */
 
-export function RegisterForm({ inviteToken }: { inviteToken?: string }) {
+export function RegisterForm({
+  inviteToken,
+  groupToken,
+}: {
+  inviteToken?: string;
+  groupToken?: string;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -211,7 +232,7 @@ export function RegisterForm({ inviteToken }: { inviteToken?: string }) {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, inviteToken }),
+        body: JSON.stringify({ name, email, password, inviteToken, groupToken }),
       });
 
       const body = await res.json();
@@ -326,21 +347,25 @@ export function RegisterForm({ inviteToken }: { inviteToken?: string }) {
       )}
 
       {/* Submit */}
-      <Button
+      <button
         type="submit"
-        size="lg"
         disabled={loading}
-        className="mt-1 h-12 w-full rounded-xl bg-[var(--color-pitch)] text-white font-semibold transition-all duration-200 hover:bg-[var(--color-pitch-bright)] hover:shadow-lg hover:shadow-[var(--color-pitch)]/25 active:scale-[0.98] disabled:opacity-60"
+        className="group relative mt-1 flex h-14 w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-[var(--color-gold)] to-[var(--color-gold-bright)] text-base font-bold uppercase tracking-wide text-black shadow-lg shadow-[var(--color-gold)]/30 transition-all duration-200 hover:shadow-xl hover:shadow-[var(--color-gold)]/45 hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
       >
+        {/* Reflet animé au survol */}
+        <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
         {loading ? (
-          <span className="flex items-center gap-2">
-            <Loader2 className="size-4 animate-spin" />
+          <>
+            <Loader2 className="size-5 animate-spin" />
             Création du compte...
-          </span>
+          </>
         ) : (
-          "Creer mon compte"
+          <>
+            <Sparkles className="size-5" />
+            Créer mon compte
+          </>
         )}
-      </Button>
+      </button>
     </form>
   );
 }

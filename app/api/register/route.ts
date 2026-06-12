@@ -8,6 +8,7 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(128),
   inviteToken: z.string().optional(),
+  groupToken: z.string().optional(),
 });
 
 export async function POST(req: Request) {
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { name, email, password, inviteToken } = parsed.data;
+  const { name, email, password, inviteToken, groupToken } = parsed.data;
 
   try {
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -64,6 +65,19 @@ export async function POST(req: Request) {
         where: { id: invite.id },
         data: { usesLeft: { decrement: 1 } },
       });
+    }
+
+    // Rejoint le groupe d'amis si la création vient d'un lien de groupe.
+    if (groupToken) {
+      const group = await prisma.group.findUnique({
+        where: { token: groupToken },
+        select: { id: true },
+      });
+      if (group) {
+        await prisma.groupMember.create({
+          data: { groupId: group.id, userId: user.id, role: "MEMBER" },
+        });
+      }
     }
 
     return NextResponse.json({ ok: true, userId: user.id }, { status: 201 });

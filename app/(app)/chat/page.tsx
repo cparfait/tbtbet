@@ -1,6 +1,8 @@
+import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ChatView } from "@/components/chat-view";
+import { getMyGroups, requireActiveGroup } from "@/lib/groups";
 
 export const metadata = { title: "Tchat · DaronsFC" };
 export const dynamic = "force-dynamic";
@@ -17,15 +19,21 @@ type ChatMsg = {
 
 export default async function ChatPage() {
   const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+  const userId = session.user.id;
   const currentUser = {
-    id: session?.user?.id ?? "",
-    name: session?.user?.name ?? "Daron",
-    isAdmin: session?.user?.role === "ADMIN",
+    id: userId,
+    name: session.user.name ?? "Daron",
+    isAdmin: session.user.role === "ADMIN",
   };
+
+  const activeGroup = await requireActiveGroup(userId);
+  const myGroups = await getMyGroups(userId);
 
   let initial: ChatMsg[] = [];
   try {
     const rows = await prisma.message.findMany({
+      where: { groupId: activeGroup.id },
       include: {
         user: { select: { id: true, name: true } },
         reactions: { select: { emoji: true, userId: true } },
@@ -53,5 +61,13 @@ export default async function ChatPage() {
     });
   } catch {}
 
-  return <ChatView currentUser={currentUser} initial={initial} />;
+  return (
+    <ChatView
+      currentUser={currentUser}
+      initial={initial}
+      groups={myGroups}
+      activeGroupId={activeGroup.id}
+      groupName={activeGroup.name}
+    />
+  );
 }

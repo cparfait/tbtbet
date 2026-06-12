@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, SmilePlus, Pin, PinOff, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
+import { GroupSwitcher } from "@/components/group-switcher";
 
 const REACTION_EMOJIS = ["👍", "😂", "🔥", "😮", "⚽", "💀"];
 
@@ -22,6 +23,9 @@ type ChatMsg = {
 type Props = {
   currentUser: { id: string; name: string; isAdmin: boolean };
   initial: ChatMsg[];
+  groups: { id: string; name: string }[];
+  activeGroupId: string;
+  groupName: string;
 };
 
 function formatTime(iso: string): string {
@@ -37,7 +41,13 @@ function formatTime(iso: string): string {
   });
 }
 
-export function ChatView({ currentUser, initial }: Props) {
+export function ChatView({
+  currentUser,
+  initial,
+  groups,
+  activeGroupId,
+  groupName,
+}: Props) {
   const [messages, setMessages] = useState<ChatMsg[]>(initial);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -165,7 +175,11 @@ export function ChatView({ currentUser, initial }: Props) {
 
   return (
     <div className="flex h-[calc(100dvh-7rem)] flex-col">
-      <PageHeader title="Tchat" subtitle="Le vestiaire des darons" />
+      <PageHeader
+        title="Tchat"
+        subtitle={groupName}
+        action={<GroupSwitcher groups={groups} activeId={activeGroupId} />}
+      />
 
       {/* Message list */}
       <div className="flex flex-1 flex-col gap-2 overflow-y-auto pr-1 scrollbar-thin">
