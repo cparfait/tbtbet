@@ -14,6 +14,7 @@ import type {
   LeaderboardEntry,
   LiveLeaderboardEntry,
   MatchPrediction,
+  ComparisonRow,
   BadgeDef,
   UserPrediction,
   UserStats,
@@ -225,6 +226,7 @@ export async function getLiveLeaderboard(): Promise<{
         const points = u.score?.points ?? 0;
         const livePoints = provisional.get(u.id) ?? 0;
         return {
+          userId: u.id,
           name: u.name ?? "Anonyme",
           email: u.email,
           points,
@@ -299,6 +301,71 @@ export async function getMatchPredictions(
       .sort((a, b) => (b.points ?? -1) - (a.points ?? -1));
   } catch {
     return [];
+  }
+}
+
+/**
+ * Compare les pronos d'un joueur cible avec les miens, sur les matchs DÉJÀ
+ * commencés uniquement (anti-influence). Triés du plus récent au plus ancien.
+ */
+export async function getPredictionComparison(
+  viewerId: string,
+  targetId: string
+): Promise<{ targetName: string; rows: ComparisonRow[] } | null> {
+  try {
+    const target = await prisma.user.findUnique({
+      where: { id: targetId },
+      select: { name: true },
+    });
+    if (!target) return null;
+
+    const now = new Date();
+    const targetPreds = await prisma.prediction.findMany({
+      where: { userId: targetId, match: { kickoffAt: { lte: now } } },
+      include: { match: { include: { result: true } } },
+      orderBy: { match: { kickoffAt: "desc" } },
+    });
+
+    const matchIds = targetPreds.map((p) => p.matchId);
+    const minePreds = await prisma.prediction.findMany({
+      where: { userId: viewerId, matchId: { in: matchIds } },
+    });
+    const mineByMatch = new Map(minePreds.map((p) => [p.matchId, p]));
+
+    const rows: ComparisonRow[] = targetPreds.map((tp) => {
+      const r = tp.match.result;
+      const scored = r && (r.status === "FINISHED" || r.status === "LIVE");
+      const pts = (p: { homeScore: number; awayScore: number; joker: boolean }) =>
+        scored
+          ? computePoints(
+              { homeScore: p.homeScore, awayScore: p.awayScore },
+              { homeScore: r!.homeScore, awayScore: r!.awayScore },
+              p.joker
+            ).points
+          : null;
+      const mine = mineByMatch.get(tp.matchId);
+      return {
+        match: toUiMatch(tp.match),
+        theirs: {
+          homeScore: tp.homeScore,
+          awayScore: tp.awayScore,
+          joker: tp.joker,
+          points: pts(tp),
+        },
+        mine: mine
+          ? {
+              homeScore: mine.homeScore,
+              awayScore: mine.awayScore,
+              joker: mine.joker,
+              points: pts(mine),
+            }
+          : null,
+      };
+    });
+
+    return { targetName: target.name ?? "Anonyme", rows };
+  } catch {
+    return null;
   }
 }
 

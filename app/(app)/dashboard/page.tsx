@@ -12,7 +12,7 @@ import {
   getMatches,
   getUserStats,
 } from "@/lib/data/queries";
-import { dayKey, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Hub \u00b7 DaronsFC" };
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ const MEDALS = ["\u{1F947}", "\u{1F948}", "\u{1F949}"];
 export default async function DashboardPage() {
   const session = await auth();
   const firstName = session?.user?.name?.split(" ")[0] ?? "Daron";
-  const today = dayKey(new Date());
+  const now = Date.now();
 
   const [matches, { entries: leaderboard, hasLive }] = await Promise.all([
     getMatches(),
@@ -43,13 +43,27 @@ export default async function DashboardPage() {
     ? leaderboard.find((u) => u.email === session.user?.email)?.rank
     : undefined;
 
-  const todayMatches = matches.filter((m) => dayKey(m.kickoffAt) === today);
-  // Met en avant un match en direct s'il y en a un, sinon le 1er match du jour.
-  const featuredMatch = matches.find((m) => m.live) ?? todayMatches[0];
+  // Match « à la une » : priorité au direct, sinon prochain match, sinon dernier joué.
+  const liveMatch = matches.find((m) => m.live);
+  const upcoming = matches
+    .filter((m) => new Date(m.kickoffAt).getTime() > now)
+    .sort((a, b) => +new Date(a.kickoffAt) - +new Date(b.kickoffAt));
+  const lastPlayed = matches
+    .filter((m) => m.result)
+    .sort((a, b) => +new Date(b.kickoffAt) - +new Date(a.kickoffAt))[0];
+  const featuredMatch = liveMatch ?? upcoming[0] ?? lastPlayed;
+  const featuredStarted =
+    !!featuredMatch &&
+    (!!featuredMatch.live ||
+      !!featuredMatch.result ||
+      new Date(featuredMatch.kickoffAt).getTime() <= now);
+  const featuredLabel = featuredMatch?.live
+    ? "En direct"
+    : featuredStarted
+      ? "Dernier match"
+      : "Prochain match";
 
-  const upcomingMatches = matches
-    .filter((m) => !m.result && new Date(m.kickoffAt) > new Date())
-    .slice(0, 3);
+  const upcomingMatches = upcoming.slice(0, 3);
 
   const avatar = session?.user?.image;
 
@@ -123,7 +137,7 @@ export default async function DashboardPage() {
       {featuredMatch && (
         <div className="mb-6 animate-stagger stagger-2">
           <h2 className="mb-3 font-[family-name:var(--font-display)] text-sm font-semibold uppercase tracking-widest text-[var(--color-muted)]">
-            Match du jour
+            {featuredLabel}
           </h2>
           <Link href={"/matches/" + featuredMatch.id} className="block">
             <Card className="glass-strong glow-pitch relative overflow-hidden p-0 transition-all duration-300 hover:scale-[1.01]">
@@ -195,7 +209,7 @@ export default async function DashboardPage() {
 
                 <div className="mt-5 flex justify-center">
                   <span className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[var(--color-pitch)] to-[var(--color-pitch-bright)] px-6 py-2.5 font-[family-name:var(--font-display)] text-sm font-bold uppercase tracking-wide text-white shadow-lg shadow-[var(--color-pitch)]/25 transition-transform hover:scale-105">
-                    Pronostiquer
+                    {featuredStarted ? "Voir les pronos" : "Pronostiquer"}
                     <ChevronRight className="size-4" />
                   </span>
                 </div>
@@ -267,7 +281,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {todayMatches.length === 0 && upcomingMatches.length === 0 && (
+      {!featuredMatch && upcomingMatches.length === 0 && (
         <Card className="glass p-8 text-center">
           <p className="text-sm text-[var(--color-muted)]">
             {"Aucun match \u00e0 venir. Repose tes pronos \u{1F634}"}

@@ -1,6 +1,5 @@
 import { PageHeader } from "@/components/page-header";
 import { MatchCardInteractive } from "@/components/match-card-interactive";
-import { LiveRefresher } from "@/components/live-refresher";
 import { Card } from "@/components/ui/card";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -28,13 +27,11 @@ function groupByDay(matches: Match[]) {
 }
 
 export default async function MatchesPage() {
-  const [matches, session] = await Promise.all([getMatches(), auth()]);
+  const [allMatches, session] = await Promise.all([getMatches(), auth()]);
+  // Onglet « Matchs » = uniquement les matchs à venir (pas encore commencés).
+  const now = Date.now();
+  const matches = allMatches.filter((m) => new Date(m.kickoffAt).getTime() > now);
   const days = groupByDay(matches);
-  const totalMatches = matches.length;
-  const finishedCount = matches.filter(
-    (m) => m.result?.status === "FINISHED"
-  ).length;
-  const hasLive = matches.some((m) => m.live);
 
   // Pronostics de l'utilisateur + jokers utilisés par phase (pour l'inline).
   const predByMatch = new Map<
@@ -71,43 +68,45 @@ export default async function MatchesPage() {
     return Math.max(0, JOKER_BUDGET[phase] - (used - thisJoker));
   }
 
+  // Matchs à venir sans pronostic.
+  const unpredicted = matches.filter((m) => !predByMatch.has(m.id)).length;
+
   return (
     <>
-      {hasLive && <LiveRefresher seconds={30} />}
-
       {/* ── Header ── */}
-      <PageHeader title="Matchs" subtitle="Coupe du Monde 2026" />
+      <PageHeader title="Matchs" subtitle="À venir — Coupe du Monde 2026" />
 
-      {/* ── Stats bar ── */}
-      <div className="mb-6 flex items-center gap-3">
-        <div className="glass flex items-center gap-2 rounded-full px-3.5 py-1.5">
-          <span className="text-xs font-[family-name:var(--font-mono)] text-[var(--color-muted)]">
-            {totalMatches}
+      {/* ── Bulle : matchs sans prono ── */}
+      {unpredicted > 0 ? (
+        <Card className="glass mb-6 flex items-center gap-3 border-[var(--color-gold)]/30 bg-[var(--color-gold)]/[0.06] p-3.5">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-gold)]/15 text-lg">
+            ⏳
           </span>
-          <span className="text-xs text-[var(--color-muted)]">matchs</span>
-        </div>
-        <div className="glass flex items-center gap-2 rounded-full px-3.5 py-1.5">
-          <span className="size-2 rounded-full bg-[var(--color-pitch-bright)]" />
-          <span className="text-xs font-[family-name:var(--font-mono)] text-[var(--color-pitch-bright)]">
-            {finishedCount}
-          </span>
-          <span className="text-xs text-[var(--color-muted)]">terminés</span>
-        </div>
-        <div className="glass flex items-center gap-2 rounded-full px-3.5 py-1.5">
-          <span className="size-2 rounded-full bg-[var(--color-gold)]" />
-          <span className="text-xs font-[family-name:var(--font-mono)] text-[var(--color-gold)]">
-            {totalMatches - finishedCount}
-          </span>
-          <span className="text-xs text-[var(--color-muted)]">à jouer</span>
-        </div>
-      </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-[var(--color-cream)]">
+              {unpredicted} match{unpredicted > 1 ? "s" : ""} sans prono
+            </p>
+            <p className="text-xs text-[var(--color-muted)]">
+              Place tes pronos avant le coup d&apos;envoi !
+            </p>
+          </div>
+        </Card>
+      ) : matches.length > 0 ? (
+        <Card className="glass mb-6 flex items-center gap-3 border-[var(--color-pitch)]/30 bg-[var(--color-pitch)]/[0.05] p-3.5">
+          <span className="text-lg">✅</span>
+          <p className="text-sm font-medium text-[var(--color-cream)]">
+            Tous tes pronos à venir sont placés. Bien joué !
+          </p>
+        </Card>
+      ) : null}
 
       {/* ── Empty state ── */}
-      {totalMatches === 0 && (
+      {matches.length === 0 && (
         <Card className="glass p-8 text-center">
           <p className="text-sm text-[var(--color-muted)]">
-            Aucun match pour l&apos;instant. Lance la synchronisation
-            API-Football depuis la console admin. ⚽
+            Aucun match à venir. Direction l&apos;onglet{" "}
+            <span className="font-semibold text-[var(--color-cream)]">Résultats</span>{" "}
+            pour les matchs passés. ⚽
           </p>
         </Card>
       )}

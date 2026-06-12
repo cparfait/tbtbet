@@ -1,4 +1,5 @@
-import { ArrowUp, ArrowDown, Minus, Radio } from "lucide-react";
+import Link from "next/link";
+import { ArrowUp, ArrowDown, Minus, Radio, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { LiveRefresher } from "@/components/live-refresher";
@@ -72,8 +73,8 @@ export default async function LeaderboardPage() {
           const isChampion = i === 0;
 
           return (
+            <Link key={user.email} href={`/leaderboard/${user.userId}`} className="block">
             <Card
-              key={user.email}
               className={cn(
                 "flex items-center gap-3 p-3 transition-colors duration-200 hover:bg-[var(--color-surface-2)]",
                 isChampion &&
@@ -128,7 +129,10 @@ export default async function LeaderboardPage() {
                   </span>
                 )}
               </div>
+
+              <ChevronRight className="size-4 shrink-0 text-[var(--color-muted)]" />
             </Card>
+            </Link>
           );
         })}
       </div>

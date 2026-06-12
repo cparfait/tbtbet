@@ -69,6 +69,7 @@ export type LeaderboardEntry = {
 /** Entrée du classement LIVE (points acquis + points provisoires en cours). */
 export type LiveLeaderboardEntry = {
   rank: number;
+  userId: string;
   name: string;
   email: string;
   /** Points déjà acquis (matchs terminés). */
@@ -108,6 +109,13 @@ export type UserPrediction = {
   joker: boolean;
   comment?: string;
   match: Match;
+};
+
+/** Ligne de comparaison de pronos entre le viewer et un autre joueur. */
+export type ComparisonRow = {
+  match: Match;
+  theirs: { homeScore: number; awayScore: number; joker: boolean; points: number | null };
+  mine: { homeScore: number; awayScore: number; joker: boolean; points: number | null } | null;
 };
 
 /** Pronostic d'un joueur sur un match donné (vue publique après coup d'envoi). */

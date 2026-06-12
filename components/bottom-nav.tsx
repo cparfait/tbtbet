@@ -3,12 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { Home, CalendarDays, Trophy, MessageCircle, User } from "lucide-react";
+import {
+  Home,
+  CalendarDays,
+  ListChecks,
+  Trophy,
+  MessageCircle,
+  User,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
   { href: "/dashboard", label: "Hub", icon: Home },
   { href: "/matches", label: "Matchs", icon: CalendarDays },
+  { href: "/results", label: "Résultats", icon: ListChecks },
   { href: "/leaderboard", label: "Classement", icon: Trophy },
   { href: "/chat", label: "Tchat", icon: MessageCircle },
   { href: "/profile", label: "Profil", icon: User },
