@@ -22,7 +22,12 @@ const BADGES = [
 async function bootstrapAdmin(): Promise<void> {
   const email = process.env.ADMIN_EMAIL?.trim();
   const password = process.env.ADMIN_PASSWORD;
-  if (!email || !password) return;
+  if (!email || !password) {
+    console.log(
+      `[init] admin NON configuré — ADMIN_EMAIL=${email ? "ok" : "MANQUANT"}, ADMIN_PASSWORD=${password ? "ok" : "MANQUANT"}`
+    );
+    return;
+  }
 
   const passwordHash = await bcrypt.hash(password, 10);
   const existing = await prisma.user.findUnique({ where: { email } });
@@ -57,8 +62,12 @@ export async function maybeInit(): Promise<void> {
     for (const badge of BADGES) {
       await prisma.badge.upsert({ where: { key: badge.key }, update: badge, create: badge });
     }
+  } catch (e) {
+    console.error("[init] échec seed badges:", e instanceof Error ? e.message : e);
+  }
+  try {
     await bootstrapAdmin();
-  } catch {
-    // Silencieux — ne bloque pas le démarrage
+  } catch (e) {
+    console.error("[init] échec bootstrap admin:", e instanceof Error ? e.message : e);
   }
 }
