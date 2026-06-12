@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { RegisterForm } from "@/components/auth-buttons";
+import { RegisterForm, GoogleSignInButton } from "@/components/auth-buttons";
 
 export default async function RegisterPage() {
   const session = await auth();
@@ -89,6 +89,16 @@ export default async function RegisterPage() {
             <p className="mt-1.5 text-sm text-[var(--color-muted)]">
               Cree ton compte et commence a prono.
             </p>
+          </div>
+
+          {/* Google sign-in */}
+          <GoogleSignInButton className="w-full" />
+
+          {/* Divider */}
+          <div className="my-6 flex items-center gap-3">
+            <span className="h-px flex-1 bg-[var(--color-border-subtle)]" />
+            <span className="text-xs font-medium uppercase tracking-wider text-[var(--color-muted)]">ou</span>
+            <span className="h-px flex-1 bg-[var(--color-border-subtle)]" />
           </div>
 
           {/* Register form */}

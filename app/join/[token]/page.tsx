@@ -2,7 +2,7 @@ import Link from "next/link";
 import { TriangleAlert, Users } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { RegisterForm } from "@/components/auth-buttons";
+import { RegisterForm, GoogleSignInButton } from "@/components/auth-buttons";
 import { JoinGroupButton } from "@/components/join-group-button";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +81,12 @@ export default async function JoinGroupPage({
                   <p className="mb-4 text-center text-sm text-[var(--color-muted)]">
                     Crée ton compte pour rejoindre la bande et pronostiquer.
                   </p>
+                  <GoogleSignInButton className="mb-4" callbackUrl={`/join/${token}`} />
+                  <div className="mb-4 flex items-center gap-3">
+                    <span className="h-px flex-1 bg-[var(--color-border-subtle)]" />
+                    <span className="text-xs font-medium uppercase tracking-wider text-[var(--color-muted)]">ou</span>
+                    <span className="h-px flex-1 bg-[var(--color-border-subtle)]" />
+                  </div>
                   <RegisterForm groupToken={token} />
                   <p className="mt-6 text-center text-sm text-[var(--color-muted)]">
                     Déjà un compte ?{" "}
