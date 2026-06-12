@@ -80,6 +80,7 @@ model Result {
   homeScore Int
   awayScore Int
   status    MatchStatus @default(SCHEDULED)
+  notified  Boolean    @default(false) // notif push résultat déjà envoyée ?
   updatedAt DateTime   @default(now()) @updatedAt
   match     Match      @relation(fields: [matchId], references: [id], onDelete: Cascade)
 }

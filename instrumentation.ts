@@ -22,11 +22,22 @@ export async function register() {
   const [{ syncMatches, hasActiveMatchWindow }, { maybeInit }] =
     await Promise.all([import("./lib/football-data"), import("./lib/init")]);
 
+  const port = process.env.PORT ?? "3000";
+  const notifyUrl = `http://127.0.0.1:${port}/api/internal/notify-results`;
+
   const runSync = async () => {
     try {
       const r = await syncMatches();
       if (r.results > 0) {
         console.log(`[auto-sync] ✓ ${r.matches} matchs, ${r.results} résultats`);
+      }
+      // Notifs « résultat tombé » via la route node dédiée (fetch, pas
+      // d'import → web-push reste hors du bundle edge de l'instrumentation).
+      if (process.env.AUTH_SECRET) {
+        fetch(notifyUrl, {
+          method: "POST",
+          headers: { "x-internal-secret": process.env.AUTH_SECRET },
+        }).catch(() => {});
       }
     } catch (err) {
       console.error("[auto-sync] ✗", err instanceof Error ? err.message : err);
