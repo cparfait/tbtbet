@@ -16,6 +16,7 @@ type ChatMsg = {
   user: string;
   text: string;
   pinned: boolean;
+  isSystem?: boolean; // récap auto → rendu en bandeau centré
   timestamp: string; // ISO
   reactions: Reaction[];
 };
@@ -194,6 +195,76 @@ export function ChatView({
         )}
 
         {messages.map((msg, i) => {
+          // Récap auto (bot système) → bandeau centré, distinct des bulles.
+          if (msg.isSystem) {
+            return (
+              <div key={msg.id} className="my-1 flex justify-center">
+                <Card className="glass max-w-[92%] border-[var(--color-gold)]/25 bg-[var(--color-gold)]/[0.04] px-4 py-3">
+                  <div className="mb-1.5 flex items-center justify-center gap-1.5">
+                    <span className="text-sm">⚽</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-gold)]">
+                      Récap du match
+                    </span>
+                  </div>
+                  <p className="whitespace-pre-line text-center text-sm leading-relaxed text-[var(--color-cream)]">
+                    {msg.text}
+                  </p>
+                  {msg.reactions.length > 0 && (
+                    <div className="mt-2 flex flex-wrap justify-center gap-1">
+                      {msg.reactions.map((r) => (
+                        <button
+                          key={r.emoji}
+                          type="button"
+                          onClick={() => handleReact(msg.id, r.emoji)}
+                          className={`flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs transition-colors ${
+                            r.mine
+                              ? "bg-[var(--color-pitch)]/20 text-[var(--color-pitch-bright)]"
+                              : "bg-[var(--color-surface-2)] text-[var(--color-muted)]"
+                          }`}
+                        >
+                          <span>{r.emoji}</span>
+                          <span className="font-[family-name:var(--font-mono)]">{r.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-2 flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPickerFor(pickerFor === msg.id ? null : msg.id)}
+                      className="text-[10px] text-[var(--color-muted)] hover:text-[var(--color-cream)]"
+                    >
+                      Réagir
+                    </button>
+                    {currentUser.isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(msg.id)}
+                        className="text-[10px] text-[var(--color-muted)] hover:text-red-400"
+                      >
+                        Supprimer
+                      </button>
+                    )}
+                  </div>
+                  {pickerFor === msg.id && (
+                    <div className="mt-2 flex flex-wrap justify-center gap-1 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] p-1.5">
+                      {REACTION_EMOJIS.map((e) => (
+                        <button
+                          key={e}
+                          type="button"
+                          onClick={() => handleReact(msg.id, e)}
+                          className="flex size-7 items-center justify-center rounded-lg text-base transition-transform hover:scale-125"
+                        >
+                          {e}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            );
+          }
+
           const isOwn = msg.userId === currentUser.id;
           const canDelete = isOwn || currentUser.isAdmin;
 

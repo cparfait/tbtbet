@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
+import { SYSTEM_USER_EMAIL, SYSTEM_USER_NAME } from "./match-recap";
 
 const BADGES = [
   { key: "premier_pas", label: "Premier pas", emoji: "👣", description: "Ton tout premier pronostic." },
@@ -53,6 +54,24 @@ async function bootstrapAdmin(): Promise<void> {
   console.log(`[init] compte admin créé (${email})`);
 }
 
+/**
+ * Compte « système » DaronsFC — auteur des récaps auto postés dans les tchats.
+ * `banned: true` le tient hors des classements et listes de membres (défensif :
+ * il n'est de toute façon membre d'aucun groupe).
+ */
+async function bootstrapSystemUser(): Promise<void> {
+  await prisma.user.upsert({
+    where: { email: SYSTEM_USER_EMAIL },
+    update: { name: SYSTEM_USER_NAME },
+    create: {
+      email: SYSTEM_USER_EMAIL,
+      name: SYSTEM_USER_NAME,
+      role: "USER",
+      banned: true,
+    },
+  });
+}
+
 let done = false;
 
 export async function maybeInit(): Promise<void> {
@@ -69,5 +88,10 @@ export async function maybeInit(): Promise<void> {
     await bootstrapAdmin();
   } catch (e) {
     console.error("[init] échec bootstrap admin:", e instanceof Error ? e.message : e);
+  }
+  try {
+    await bootstrapSystemUser();
+  } catch (e) {
+    console.error("[init] échec bootstrap bot système:", e instanceof Error ? e.message : e);
   }
 }

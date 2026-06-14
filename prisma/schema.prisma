@@ -127,6 +127,9 @@ model Message {
   groupId   String? // tchat propre à un groupe (null = ancien tchat global)
   content   String
   pinned    Boolean    @default(false)
+  isSystem  Boolean    @default(false) // message auto → rendu en bandeau
+  systemKind String? // "RECAP" | "REMINDER" — distingue les messages auto
+  matchId   String? // message rattaché à un match → idempotence (1 / match / groupe / kind)
   createdAt DateTime   @default(now())
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   group     Group?     @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -134,6 +137,7 @@ model Message {
 
   @@index([createdAt])
   @@index([groupId, createdAt])
+  @@index([groupId, matchId])
 }
 
 model Reaction {

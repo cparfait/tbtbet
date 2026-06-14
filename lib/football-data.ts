@@ -10,6 +10,7 @@ import { prisma } from "./prisma";
 import { countryCode } from "./flags";
 import { computePoints } from "./scoring";
 import { compareRanked } from "./ranking";
+import { postMatchRecaps, postKickoffReminders } from "./match-recap";
 import type { Stage } from "./data/matches";
 
 const BASE_URL = "https://api.football-data.org/v4";
@@ -257,6 +258,11 @@ async function runSyncMatches(
     }
   }
 
+  // Rappels « pense à pronostiquer » pour les matchs imminents (idempotent).
+  await postKickoffReminders().catch((e) =>
+    console.error("[reminder] ignoré:", e instanceof Error ? e.message : e)
+  );
+
   return { matches: data.matches.length, results };
 }
 
@@ -339,16 +345,20 @@ export async function applyMatchResult(
   awayScore: number,
   opts: { force?: boolean } = {}
 ): Promise<{ scored: number }> {
+  // Statut AVANT cet appel → permet de détecter la transition vers FINISHED
+  // (pour ne poster le récap chat qu'une fois, jamais sur un simple rescore).
+  const priorResult = await prisma.result.findUnique({ where: { matchId } });
+  const justFinished = priorResult?.status !== "FINISHED";
+
   // Fast-path pour la sync auto (toutes les 90 s en live) : si ce résultat est
   // déjà enregistré à l'identique et qu'aucun prono n'attend de points, il n'y
   // a rien à faire — on évite de rouvrir transaction + recalcul + badges pour
   // chaque match terminé à chaque cycle.
   if (!opts.force) {
-    const existing = await prisma.result.findUnique({ where: { matchId } });
     if (
-      existing?.status === "FINISHED" &&
-      existing.homeScore === homeScore &&
-      existing.awayScore === awayScore
+      priorResult?.status === "FINISHED" &&
+      priorResult.homeScore === homeScore &&
+      priorResult.awayScore === awayScore
     ) {
       const pending = await prisma.prediction.count({
         where: { matchId, pointsAwarded: null },
@@ -447,6 +457,14 @@ export async function applyMatchResult(
       )
     )
   );
+
+  // Récap auto dans le tchat de chaque groupe — uniquement à la transition vers
+  // FINISHED (jamais sur un rescore). Idempotent par (match, groupe).
+  if (justFinished) {
+    await postMatchRecaps(matchId).catch((e) =>
+      console.error("[recap] ignoré:", e instanceof Error ? e.message : e)
+    );
+  }
 
   return { scored: preds.length };
 }

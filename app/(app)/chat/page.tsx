@@ -13,6 +13,7 @@ type ChatMsg = {
   user: string;
   text: string;
   pinned: boolean;
+  isSystem: boolean;
   timestamp: string;
   reactions: { emoji: string; count: number; mine: boolean }[];
 };
@@ -59,6 +60,7 @@ export default async function ChatPage() {
         user: m.user.name ?? "Daron",
         text: m.content,
         pinned: m.pinned,
+        isSystem: m.isSystem,
         timestamp: m.createdAt.toISOString(),
         reactions: [...map.values()],
       };

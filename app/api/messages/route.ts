@@ -50,6 +50,7 @@ export async function GET(req: Request) {
         user: m.user.name ?? "Daron",
         text: m.content,
         pinned: m.pinned,
+        isSystem: m.isSystem,
         timestamp: m.createdAt.toISOString(),
         reactions: aggregateReactions(m.reactions, meId),
       }))
@@ -147,6 +148,7 @@ export async function POST(req: Request) {
       user: msg.user.name ?? "Daron",
       text: msg.content,
       pinned: msg.pinned,
+      isSystem: msg.isSystem,
       timestamp: msg.createdAt.toISOString(),
       reactions: [],
     });
