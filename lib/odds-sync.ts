@@ -14,12 +14,25 @@ import { prisma } from "./prisma";
 import { countryCode } from "./flags";
 import { fetchLiveOdds, type OddsMatch, type Odds1x2 } from "./odds";
 
-const ODDS_INTERVAL_MS = 6 * 60 * 60_000; // 6 h
-let lastOddsFetchAt = 0;
-let oddsInFlight: Promise<{ updated: number }> | null = null;
+const ODDS_INTERVAL_MS = 6 * 60 * 60_000; // 6 h entre deux captures réussies
+const ODDS_ERROR_BACKOFF_MS = 15 * 60_000; // retry plus tôt après un échec dur
+const SOON_MS = 72 * 60 * 60_000; // fenêtre « match imminent » pour l'alerte
+
+type SnapshotResult = {
+  updated: number;
+  /** Matchs imminents non appariés (probable nom d'équipe non mappé). */
+  unmatchedSoon: string[];
+};
+
+// `nextOddsFetchAt` = prochain instant autorisé. Armé seulement sur SUCCÈS (6 h)
+// ou avec un backoff court sur échec → un souci API ne gèle plus 6 h.
+let nextOddsFetchAt = 0;
+let oddsInFlight: Promise<SnapshotResult> | null = null;
 
 type MatchRow = {
   id: string;
+  homeTeam: string;
+  awayTeam: string;
   homeFlag: string;
   awayFlag: string;
   kickoffAt: Date;
@@ -65,20 +78,34 @@ function matchOdds(events: OddsMatch[], m: MatchRow): Odds1x2 | null {
  * match déjà commencé → la dernière valeur stockée reste la « closing odd ».
  * No-op silencieux si aucune clé `ODDS_API_KEY` (fetchLiveOdds → null).
  */
-export async function snapshotOdds(): Promise<{ updated: number }> {
+export async function snapshotOdds(): Promise<SnapshotResult> {
   const events = await fetchLiveOdds();
-  if (!events || events.length === 0) return { updated: 0 };
+  if (!events || events.length === 0) return { updated: 0, unmatchedSoon: [] };
 
   const now = new Date();
+  const soon = now.getTime() + SOON_MS;
   const matches = await prisma.match.findMany({
     where: { kickoffAt: { gt: now } },
-    select: { id: true, homeFlag: true, awayFlag: true, kickoffAt: true },
+    select: {
+      id: true,
+      homeTeam: true,
+      awayTeam: true,
+      homeFlag: true,
+      awayFlag: true,
+      kickoffAt: true,
+    },
   });
 
   let updated = 0;
+  const unmatchedSoon: string[] = [];
   for (const m of matches) {
     const odds = matchOdds(events, m);
-    if (!odds) continue;
+    if (!odds) {
+      // Match imminent sans cote → souvent un nom d'équipe non mappé : on le
+      // signale pour backfill manuel (panneau admin « 🎲 Cotes manuelles »).
+      if (+m.kickoffAt < soon) unmatchedSoon.push(`${m.homeTeam}–${m.awayTeam}`);
+      continue;
+    }
     await prisma.match.update({
       where: { id: m.id },
       data: {
@@ -90,7 +117,7 @@ export async function snapshotOdds(): Promise<{ updated: number }> {
     });
     updated++;
   }
-  return { updated };
+  return { updated, unmatchedSoon };
 }
 
 /**
@@ -98,10 +125,8 @@ export async function snapshotOdds(): Promise<{ updated: number }> {
  * un match à venir (garde-fou « pas d'appel sans match »). À appeler depuis la
  * boucle de sync.
  */
-export async function maybeSnapshotOdds(
-  minIntervalMs = ODDS_INTERVAL_MS
-): Promise<void> {
-  if (Date.now() - lastOddsFetchAt < minIntervalMs) return;
+export async function maybeSnapshotOdds(): Promise<void> {
+  if (Date.now() < nextOddsFetchAt) return;
   if (oddsInFlight) {
     await oddsInFlight.catch(() => {});
     return;
@@ -112,14 +137,21 @@ export async function maybeSnapshotOdds(
   });
   if (upcoming === 0) return;
 
-  oddsInFlight = snapshotOdds().finally(() => {
-    lastOddsFetchAt = Date.now();
-    oddsInFlight = null;
-  });
+  oddsInFlight = snapshotOdds();
   try {
-    const { updated } = await oddsInFlight;
+    const { updated, unmatchedSoon } = await oddsInFlight;
+    nextOddsFetchAt = Date.now() + ODDS_INTERVAL_MS; // succès → prochaine dans 6 h
     if (updated > 0) console.log(`[odds] ✓ ${updated} matchs cotés`);
+    if (unmatchedSoon.length > 0) {
+      console.warn(
+        `[odds] ⚠ ${unmatchedSoon.length} match(s) imminent(s) sans cote (à backfiller) : ${unmatchedSoon.join(", ")}`
+      );
+    }
   } catch (e) {
+    // Échec dur (clé invalide, réseau…) → on retente bientôt, pas dans 6 h.
+    nextOddsFetchAt = Date.now() + ODDS_ERROR_BACKOFF_MS;
     console.error("[odds] ✗", e instanceof Error ? e.message : e);
+  } finally {
+    oddsInFlight = null;
   }
 }
