@@ -33,32 +33,44 @@ type Props = {
   jokerBudget: number;
 };
 
-function ScoreStepper({
+/**
+ * Colonne « issue » d'une équipe : drapeau + nom + points en jeu (si cotes) +
+ * sélecteur de score vertical. Brique de la fiche de paris en 3 colonnes.
+ */
+function OutcomeColumn({
   flag,
   name,
+  pts,
   value,
   onChange,
   disabled,
 }: {
   flag: string;
   name: string;
+  pts: number | null;
   value: number;
   onChange: (v: number) => void;
   disabled: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <div className="flex min-w-0 items-center gap-2">
-        <Flag code={flag} className="h-5 w-7 shrink-0" />
-        <span className="truncate text-sm font-medium">{name}</span>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
+    <div className="flex flex-1 flex-col items-center gap-1.5 rounded-xl bg-[var(--color-surface-2)] p-2.5">
+      <Flag code={flag} className="h-6 w-9 shrink-0 drop-shadow" />
+      <span className="w-full truncate text-center text-xs font-medium">{name}</span>
+      {pts !== null && (
+        <span className="font-[family-name:var(--font-display)] text-sm font-bold tabular-nums text-[var(--color-gold)]">
+          {pts}
+          <span className="ml-0.5 text-[9px] font-semibold text-[var(--color-muted)]">
+            pts
+          </span>
+        </span>
+      )}
+      <div className="mt-0.5 flex items-center gap-1.5">
         <button
           type="button"
           aria-label={`Moins ${name}`}
           disabled={disabled || value <= 0}
           onClick={() => onChange(Math.max(0, value - 1))}
-          className="flex size-7 items-center justify-center rounded-full bg-[var(--color-surface-2)] disabled:opacity-30"
+          className="flex size-7 items-center justify-center rounded-full bg-[var(--color-bg)]/60 disabled:opacity-30"
         >
           <Minus className="size-3.5" />
         </button>
@@ -80,11 +92,30 @@ function ScoreStepper({
           aria-label={`Plus ${name}`}
           disabled={disabled || value >= 20}
           onClick={() => onChange(Math.min(20, value + 1))}
-          className="flex size-7 items-center justify-center rounded-full bg-[var(--color-surface-2)] disabled:opacity-30"
+          className="flex size-7 items-center justify-center rounded-full bg-[var(--color-bg)]/60 disabled:opacity-30"
         >
           <Plus className="size-3.5" />
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Colonne centrale « Nul » : libellé + points en jeu (sans sélecteur). */
+function DrawColumn({ pts }: { pts: number | null }) {
+  return (
+    <div className="flex w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-xl bg-[var(--color-surface-2)] p-2.5">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+        Nul
+      </span>
+      {pts !== null && (
+        <span className="font-[family-name:var(--font-display)] text-sm font-bold tabular-nums text-[var(--color-gold)]">
+          {pts}
+          <span className="ml-0.5 text-[9px] font-semibold text-[var(--color-muted)]">
+            pts
+          </span>
+        </span>
+      )}
     </div>
   );
 }
@@ -244,32 +275,29 @@ export function MatchCardInteractive({
         /* ── Pronostic inline ── */
         <div className="space-y-2.5">
           {match.odds && (
-            <div>
-              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
-                Points en jeu
-              </p>
-              <div className="flex items-stretch gap-1.5">
-                <OutcomePts flag={match.homeFlag} pts={outcomeResultPoints(match.odds, 1)} />
-                <OutcomePts label="Nul" pts={outcomeResultPoints(match.odds, 0)} />
-                <OutcomePts flag={match.awayFlag} pts={outcomeResultPoints(match.odds, -1)} />
-              </div>
-            </div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+              Points en jeu
+            </p>
           )}
-
-          <ScoreStepper
-            flag={match.homeFlag}
-            name={match.homeTeam}
-            value={home}
-            onChange={setHome}
-            disabled={pending}
-          />
-          <ScoreStepper
-            flag={match.awayFlag}
-            name={match.awayTeam}
-            value={away}
-            onChange={setAway}
-            disabled={pending}
-          />
+          <div className="flex items-stretch gap-2">
+            <OutcomeColumn
+              flag={match.homeFlag}
+              name={match.homeTeam}
+              pts={match.odds ? outcomeResultPoints(match.odds, 1) : null}
+              value={home}
+              onChange={setHome}
+              disabled={pending}
+            />
+            {match.odds && <DrawColumn pts={outcomeResultPoints(match.odds, 0)} />}
+            <OutcomeColumn
+              flag={match.awayFlag}
+              name={match.awayTeam}
+              pts={match.odds ? outcomeResultPoints(match.odds, -1) : null}
+              value={away}
+              onChange={setAway}
+              disabled={pending}
+            />
+          </div>
 
           <div className="flex items-center justify-between gap-2 pt-1">
             <button
@@ -345,35 +373,6 @@ export function MatchCardInteractive({
         </div>
       )}
     </Card>
-  );
-}
-
-/** Mini-colonne « points en jeu » pour une issue (drapeau/Nul + points dorés). */
-function OutcomePts({
-  flag,
-  label,
-  pts,
-}: {
-  flag?: string;
-  label?: string;
-  pts: number | null;
-}) {
-  return (
-    <div className="flex flex-1 flex-col items-center gap-1 rounded-lg bg-[var(--color-surface-2)] py-1.5">
-      {flag ? (
-        <Flag code={flag} className="h-4 w-6" />
-      ) : (
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
-          {label}
-        </span>
-      )}
-      <span className="font-[family-name:var(--font-display)] text-sm font-bold tabular-nums text-[var(--color-gold)]">
-        {pts ?? "—"}
-        <span className="ml-0.5 text-[9px] font-semibold text-[var(--color-muted)]">
-          pts
-        </span>
-      </span>
-    </div>
   );
 }
 

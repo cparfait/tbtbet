@@ -5,6 +5,7 @@ import { ChevronRight, TrendingUp, Target, Trophy, Radio } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { MatchCard } from "@/components/match-card";
+import { OddsOutcomes } from "@/components/odds-outcomes";
 import { Flag } from "@/components/flag";
 import { Card } from "@/components/ui/card";
 import { LiveRefresher } from "@/components/live-refresher";
@@ -264,6 +265,12 @@ export default async function DashboardPage() {
                     </span>
                   </div>
                 </div>
+
+                {!featuredStarted && featuredMatch.odds && (
+                  <div className="mt-5">
+                    <OddsOutcomes odds={featuredMatch.odds} />
+                  </div>
+                )}
 
                 {featuredPrediction && (
                   <div className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-[var(--color-gold)]/20 bg-[var(--color-gold)]/[0.06] py-2 text-sm">
