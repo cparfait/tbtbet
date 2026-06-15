@@ -206,6 +206,10 @@ export type AdminMatchResult = {
   finished: boolean;
   homeScore: number | null;
   awayScore: number | null;
+  /** Cotes 1X2 figées (pour saisie/backfill manuel) — null si absentes. */
+  oddsHome: number | null;
+  oddsDraw: number | null;
+  oddsAway: number | null;
 };
 
 /**
@@ -231,6 +235,9 @@ export async function getMatchesForResultEntry(): Promise<AdminMatchResult[]> {
       finished: m.result?.status === "FINISHED",
       homeScore: m.result?.homeScore ?? null,
       awayScore: m.result?.awayScore ?? null,
+      oddsHome: m.oddsHome,
+      oddsDraw: m.oddsDraw,
+      oddsAway: m.oddsAway,
     }));
   } catch {
     return [];

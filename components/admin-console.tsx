@@ -52,6 +52,7 @@ export function AdminConsole({
       <GroupsPanel groups={groups} />
       <ImportPredictionPanel users={users} matches={allMatches} predictions={predictions} />
       <ManualScorePanel matches={matches} />
+      <OddsPanel matches={matches} />
       <RescorePanel />
       <ChampionPanel teams={championTeams} current={championOverride} />
       <UsersPanel users={users} currentUserId={currentUserId} />
@@ -651,6 +652,127 @@ function ManualScorePanel({ matches }: { matches: AdminMatchResult[] }) {
             <Button variant="gold" size="sm" onClick={submit} disabled={pending}>
               {pending ? <Loader2 className="animate-spin" /> : <Check />}
               {selected?.finished ? "Corriger le résultat" : "Enregistrer le résultat"}
+            </Button>
+          </div>
+        )}
+
+        {msg && (
+          <p
+            className={`mt-2 text-sm ${msg.ok ? "text-[var(--color-pitch-bright)]" : "text-red-400"}`}
+          >
+            {msg.text}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ─── Saisie/backfill manuel des cotes 1X2 d'un match ─── */
+function OddsPanel({ matches }: { matches: AdminMatchResult[] }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const { msg, flash } = useFeedback();
+  const [matchId, setMatchId] = useState(matches[0]?.id ?? "");
+  const selected = matches.find((m) => m.id === matchId);
+  const [h, setH] = useState(selected?.oddsHome != null ? String(selected.oddsHome) : "");
+  const [d, setD] = useState(selected?.oddsDraw != null ? String(selected.oddsDraw) : "");
+  const [a, setA] = useState(selected?.oddsAway != null ? String(selected.oddsAway) : "");
+
+  const onSelect = (id: string) => {
+    setMatchId(id);
+    const m = matches.find((x) => x.id === id);
+    setH(m?.oddsHome != null ? String(m.oddsHome) : "");
+    setD(m?.oddsDraw != null ? String(m.oddsDraw) : "");
+    setA(m?.oddsAway != null ? String(m.oddsAway) : "");
+  };
+
+  const submit = () =>
+    start(async () => {
+      const oddsHome = Number(h);
+      const oddsDraw = Number(d);
+      const oddsAway = Number(a);
+      if (!matchId || ![oddsHome, oddsDraw, oddsAway].every((x) => x > 1)) {
+        flash("Saisis les 3 cotes décimales (> 1, ex. 1.85).", false);
+        return;
+      }
+      try {
+        const res = await fetch("/api/admin/odds", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ matchId, oddsHome, oddsDraw, oddsAway }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Erreur");
+        flash(
+          data.finished
+            ? `✓ Cotes enregistrées (${data.scored} pronos recalculés)`
+            : "✓ Cotes enregistrées",
+          true
+        );
+        router.refresh();
+      } catch (e) {
+        flash(e instanceof Error ? e.message : "Erreur", false);
+      }
+    });
+
+  const oddInput = (
+    label: string,
+    value: string,
+    onChange: (v: string) => void
+  ) => (
+    <label className="flex flex-col gap-1 text-center">
+      <span className="truncate text-xs text-[var(--color-muted)]">{label}</span>
+      <input
+        type="number"
+        step="0.01"
+        min="1.01"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="1.85"
+        className="h-11 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] text-center text-sm font-bold text-[var(--color-cream)]"
+      />
+    </label>
+  );
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <CardTitle className="text-base">🎲 Cotes manuelles</CardTitle>
+        <p className="mt-1 mb-3 text-sm text-[var(--color-muted)]">
+          Saisis les cotes 1X2 d&apos;un match (backfill des matchs joués avant la
+          capture auto). Si le match est terminé, les points sont recalculés.
+        </p>
+
+        {matches.length === 0 ? (
+          <p className="text-sm text-[var(--color-muted)]">
+            Aucun match commencé pour l&apos;instant.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <select
+              value={matchId}
+              onChange={(e) => onSelect(e.target.value)}
+              className="h-11 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 text-sm text-[var(--color-cream)]"
+            >
+              {matches.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.homeTeam} – {m.awayTeam}
+                  {m.oddsHome != null ? "  ✓ cotée" : ""}
+                  {m.finished ? "  · terminé" : ""}
+                </option>
+              ))}
+            </select>
+
+            <div className="grid grid-cols-3 gap-2">
+              {oddInput(selected?.homeTeam ?? "Domicile", h, setH)}
+              {oddInput("Nul", d, setD)}
+              {oddInput(selected?.awayTeam ?? "Extérieur", a, setA)}
+            </div>
+
+            <Button variant="gold" size="sm" onClick={submit} disabled={pending}>
+              {pending ? <Loader2 className="animate-spin" /> : <Check />}
+              Enregistrer les cotes
             </Button>
           </div>
         )}
