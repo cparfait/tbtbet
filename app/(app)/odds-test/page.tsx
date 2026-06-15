@@ -7,8 +7,7 @@ import { formatKickoff } from "@/lib/utils";
 import {
   fetchLiveOdds,
   impliedProbabilities,
-  outcomeTier,
-  BASE_CORRECT_RESULT,
+  resultPoints,
   SAMPLE_ODDS,
   ODDS_SPORT,
   type OddsMatch,
@@ -17,79 +16,66 @@ import {
 export const metadata = { title: "Test cotes · DaronsFC" };
 export const dynamic = "force-dynamic";
 
-/** Une colonne d'issue (1 / N / 2) : cote, proba implicite, palier, points. */
-function OutcomeCol({
-  label,
-  odds,
-  prob,
-}: {
-  label: React.ReactNode;
-  odds: number;
-  prob: number;
-}) {
-  const tier = outcomeTier(prob);
-  const points = BASE_CORRECT_RESULT + tier.bonus;
+/** Valeur de points (doré, comme les points partout dans l'app). */
+function PointsValue({ points }: { points: number }) {
   return (
-    <div className="flex flex-1 flex-col items-center gap-1 rounded-xl bg-[var(--color-surface-2)] px-2 py-3 text-center">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
-        {label}
+    <span className="font-[family-name:var(--font-display)] text-lg font-bold tabular-nums text-[var(--color-gold)]">
+      {points}
+      <span className="ml-0.5 text-[10px] font-semibold text-[var(--color-muted)]">
+        pt{points > 1 ? "s" : ""}
       </span>
-      <span className="font-[family-name:var(--font-mono)] text-lg font-bold tabular-nums text-[var(--color-cream)]">
-        {odds.toFixed(2)}
-      </span>
-      <span className="text-[11px] text-[var(--color-muted)]">
-        {Math.round(prob)}%
-      </span>
-      <span
-        className="mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-        style={{ color: tier.accent, backgroundColor: "color-mix(in srgb, currentColor 15%, transparent)" }}
-      >
-        {tier.label}
-      </span>
-      <span className="font-[family-name:var(--font-display)] text-sm font-bold text-[var(--color-pitch-bright)]">
-        {points} pt{points > 1 ? "s" : ""}
-      </span>
+    </span>
+  );
+}
+
+/** Colonne d'une issue : drapeau (ou « VS ») en haut, libellé, points dessous. */
+function Outcome({
+  flag,
+  label,
+  points,
+}: {
+  flag?: string;
+  label: string;
+  points: number;
+}) {
+  return (
+    <div className="flex flex-1 flex-col items-center gap-1.5 text-center">
+      {flag !== undefined ? (
+        <Flag code={flag} className="h-7 w-10" />
+      ) : (
+        <span className="flex h-7 items-center font-[family-name:var(--font-display)] text-xs font-bold text-[var(--color-muted)]">
+          VS
+        </span>
+      )}
+      <span className="line-clamp-1 max-w-full text-sm font-bold">{label}</span>
+      <PointsValue points={points} />
     </div>
   );
 }
 
+/** Carte d'un match dans le style de la page Matchs, points sous chaque issue. */
 function OddsRow({ m }: { m: OddsMatch }) {
   const p = impliedProbabilities(m);
-  return (
-    <Card className="glass p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <Flag code={countryCode(m.home)} className="h-5 w-7 shrink-0" />
-          <span className="truncate text-sm font-bold">{m.home}</span>
-          <span className="text-xs text-[var(--color-muted)]">vs</span>
-          <Flag code={countryCode(m.away)} className="h-5 w-7 shrink-0" />
-          <span className="truncate text-sm font-bold">{m.away}</span>
-        </div>
-      </div>
-      <p className="mb-3 font-[family-name:var(--font-mono)] text-[11px] text-[var(--color-muted)]">
-        {formatKickoff(m.commenceTime)}
-        {m.bookmaker ? ` · ${m.bookmaker}` : ""}
-      </p>
 
-      <div className="flex items-stretch gap-2">
-        <OutcomeCol
-          label={
-            <span className="inline-flex items-center gap-1">
-              <Flag code={countryCode(m.home)} className="h-3 w-4" /> 1
-            </span>
-          }
-          odds={m.oddsHome}
-          prob={p.home}
+  return (
+    <Card className="p-4">
+      <div className="mb-3 text-xs text-[var(--color-muted)]">
+        <span className="font-[family-name:var(--font-mono)]">
+          {formatKickoff(m.commenceTime)}
+        </span>
+      </div>
+
+      <div className="flex items-start justify-between gap-2">
+        <Outcome
+          flag={countryCode(m.home)}
+          label={m.home}
+          points={resultPoints(p.home)}
         />
-        <OutcomeCol label="Nul" odds={m.oddsDraw} prob={p.draw} />
-        <OutcomeCol
-          label={
-            <span className="inline-flex items-center gap-1">
-              2 <Flag code={countryCode(m.away)} className="h-3 w-4" />
-            </span>
-          }
-          odds={m.oddsAway}
-          prob={p.away}
+        <Outcome label="Nul" points={resultPoints(p.draw)} />
+        <Outcome
+          flag={countryCode(m.away)}
+          label={m.away}
+          points={resultPoints(p.away)}
         />
       </div>
     </Card>
@@ -115,7 +101,7 @@ export default async function OddsTestPage() {
     <>
       <PageHeader
         title="Test cotes"
-        subtitle="Aperçu d'un scoring façon MPP basé sur les cotes"
+        subtitle="Points d'une victoire selon la difficulté du match"
         action={
           <span
             className={
@@ -140,8 +126,10 @@ export default async function OddsTestPage() {
             </p>
             <p className="mt-0.5">
               Ajoute une clé <code className="text-[var(--color-cream)]">ODDS_API_KEY</code>{" "}
-              (gratuite sur the-odds-api.com) pour afficher les vraies cotes du
+              (gratuite sur the-odds-api.com) pour utiliser les vraies cotes du
               sport <code className="text-[var(--color-cream)]">{ODDS_SPORT}</code>.
+              Les cotes ne sont jamais affichées — elles servent juste à calculer
+              les points.
             </p>
             {error && (
               <p className="mt-1.5 text-red-400">Dernière erreur : {error}</p>
@@ -149,35 +137,6 @@ export default async function OddsTestPage() {
           </div>
         </Card>
       )}
-
-      {/* Légende des paliers */}
-      <Card className="glass mb-5 p-3.5">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
-          Principe — plus l&apos;issue est improbable, plus elle rapporte
-        </p>
-        <ul className="space-y-1 text-xs text-[var(--color-muted)]">
-          <li>
-            <span className="font-semibold text-[var(--color-cream)]">Favori</span>{" "}
-            (≥ 50 %) → 1 pt
-          </li>
-          <li>
-            <span className="font-semibold text-[var(--color-pitch-bright)]">Équilibré</span>{" "}
-            (33–50 %) → 1 + 1 = 2 pts
-          </li>
-          <li>
-            <span className="font-semibold text-[var(--color-gold)]">Outsider</span>{" "}
-            (18–33 %) → 1 + 2 = 3 pts
-          </li>
-          <li>
-            <span className="font-semibold text-[var(--color-gold-bright)]">Gros outsider</span>{" "}
-            (&lt; 18 %) → 1 + 3 = 4 pts
-          </li>
-        </ul>
-        <p className="mt-2 text-[11px] italic text-[var(--color-muted)]">
-          Les points indiqués correspondent au « bon résultat ». Le score exact
-          et l&apos;écart de buts s&apos;ajouteraient par-dessus, comme aujourd&apos;hui.
-        </p>
-      </Card>
 
       <div className="flex flex-col gap-3">
         {matches.map((m, i) => (

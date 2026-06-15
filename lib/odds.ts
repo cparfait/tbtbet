@@ -106,27 +106,31 @@ export function impliedProbabilities(m: OddsMatch): {
   };
 }
 
-/** Palier de difficulté d'une issue, selon sa probabilité implicite. */
+/** Étiquette de difficulté d'une issue (juste pour le visuel / la couleur). */
 export type Tier = {
   label: string;
-  /** Bonus de points ajouté au « bon résultat » si cette issue se réalise. */
-  bonus: number;
   /** Couleur d'accent (variable CSS) pour l'UI. */
   accent: string;
 };
 
 export function outcomeTier(probPct: number): Tier {
-  if (probPct >= 50)
-    return { label: "Favori", bonus: 0, accent: "var(--color-muted)" };
+  if (probPct >= 50) return { label: "Favori", accent: "var(--color-muted)" };
   if (probPct >= 33)
-    return { label: "Équilibré", bonus: 1, accent: "var(--color-pitch-bright)" };
-  if (probPct >= 18)
-    return { label: "Outsider", bonus: 2, accent: "var(--color-gold)" };
-  return { label: "Gros outsider", bonus: 3, accent: "var(--color-gold-bright)" };
+    return { label: "Équilibré", accent: "var(--color-pitch-bright)" };
+  if (probPct >= 18) return { label: "Outsider", accent: "var(--color-gold)" };
+  return { label: "Gros outsider", accent: "var(--color-gold-bright)" };
 }
 
-/** Points de base pour un « bon résultat » (aligné sur le barème actuel). */
-export const BASE_CORRECT_RESULT = 1;
+/**
+ * Points pour un BON RÉSULTAT selon la proba implicite de l'issue choisie.
+ * Courbe douce bornée ~1–6 : plus l'issue est improbable, plus ça rapporte.
+ *   points = 1 + 5 × (1 − proba), arrondi.
+ * Le score exact et la différence de buts s'ajouteraient par-dessus (hors proto).
+ */
+export function resultPoints(probPct: number): number {
+  const p = Math.min(1, Math.max(0, probPct / 100));
+  return Math.round(1 + 5 * (1 - p));
+}
 
 /** Jeu d'exemple (sans clé API) — quelques affiches Coupe du Monde. */
 export const SAMPLE_ODDS: OddsMatch[] = [
