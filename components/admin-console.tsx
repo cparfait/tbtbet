@@ -689,9 +689,10 @@ function OddsPanel({ matches }: { matches: AdminMatchResult[] }) {
 
   const submit = () =>
     start(async () => {
-      const oddsHome = Number(h);
-      const oddsDraw = Number(d);
-      const oddsAway = Number(a);
+      // Tolère la virgule décimale (4,5 → 4.5) en plus du point.
+      const oddsHome = Number(h.replace(",", "."));
+      const oddsDraw = Number(d.replace(",", "."));
+      const oddsAway = Number(a.replace(",", "."));
       if (!matchId || ![oddsHome, oddsDraw, oddsAway].every((x) => x > 1)) {
         flash("Saisis les 3 cotes décimales (> 1, ex. 1.85).", false);
         return;
@@ -744,9 +745,8 @@ function OddsPanel({ matches }: { matches: AdminMatchResult[] }) {
     <label className="flex flex-col gap-1 text-center">
       <span className="truncate text-xs text-[var(--color-muted)]">{label}</span>
       <input
-        type="number"
-        step="0.01"
-        min="1.01"
+        type="text"
+        inputMode="decimal"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="1.85"
