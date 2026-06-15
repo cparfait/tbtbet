@@ -53,26 +53,26 @@ function OutcomeColumn({
   disabled: boolean;
 }) {
   return (
-    <div className="flex flex-1 flex-col items-center gap-1.5 rounded-xl bg-[var(--color-surface-2)] p-2.5">
-      <Flag code={flag} className="h-6 w-9 shrink-0 drop-shadow" />
-      <span className="w-full truncate text-center text-xs font-medium">{name}</span>
+    <div className="flex flex-1 flex-col items-center gap-2 px-2 py-2">
+      <Flag code={flag} className="h-8 w-12 shrink-0 drop-shadow" />
+      <span className="w-full truncate text-center text-sm font-medium">{name}</span>
       {pts !== null && (
-        <span className="font-[family-name:var(--font-display)] text-sm font-bold tabular-nums text-[var(--color-gold)]">
+        <span className="font-[family-name:var(--font-display)] text-lg font-bold tabular-nums text-[var(--color-gold)]">
           {pts}
-          <span className="ml-0.5 text-[9px] font-semibold text-[var(--color-muted)]">
+          <span className="ml-0.5 text-[10px] font-semibold text-[var(--color-muted)]">
             pts
           </span>
         </span>
       )}
-      <div className="mt-0.5 flex items-center gap-1.5">
+      <div className="mt-0.5 flex items-center gap-2">
         <button
           type="button"
           aria-label={`Moins ${name}`}
           disabled={disabled || value <= 0}
           onClick={() => onChange(Math.max(0, value - 1))}
-          className="flex size-7 items-center justify-center rounded-full bg-[var(--color-bg)]/60 disabled:opacity-30"
+          className="flex size-9 items-center justify-center rounded-full bg-[var(--color-bg)]/60 disabled:opacity-30"
         >
-          <Minus className="size-3.5" />
+          <Minus className="size-4" />
         </button>
         <input
           type="text"
@@ -85,16 +85,16 @@ function OutcomeColumn({
             const n = parseInt(e.target.value.replace(/\D/g, ""), 10);
             onChange(Number.isNaN(n) ? 0 : Math.min(20, n));
           }}
-          className="w-6 bg-transparent text-center font-[family-name:var(--font-display)] text-xl font-bold tabular-nums outline-none disabled:opacity-60"
+          className="w-7 bg-transparent text-center font-[family-name:var(--font-display)] text-2xl font-bold tabular-nums outline-none disabled:opacity-60"
         />
         <button
           type="button"
           aria-label={`Plus ${name}`}
           disabled={disabled || value >= 20}
           onClick={() => onChange(Math.min(20, value + 1))}
-          className="flex size-7 items-center justify-center rounded-full bg-[var(--color-bg)]/60 disabled:opacity-30"
+          className="flex size-9 items-center justify-center rounded-full bg-[var(--color-bg)]/60 disabled:opacity-30"
         >
-          <Plus className="size-3.5" />
+          <Plus className="size-4" />
         </button>
       </div>
     </div>
@@ -104,14 +104,14 @@ function OutcomeColumn({
 /** Colonne centrale « Nul » : libellé + points en jeu (sans sélecteur). */
 function DrawColumn({ pts }: { pts: number | null }) {
   return (
-    <div className="flex w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-xl bg-[var(--color-surface-2)] p-2.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+    <div className="flex w-16 shrink-0 flex-col items-center justify-center gap-1.5 px-2 py-2">
+      <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
         Nul
       </span>
       {pts !== null && (
-        <span className="font-[family-name:var(--font-display)] text-sm font-bold tabular-nums text-[var(--color-gold)]">
+        <span className="font-[family-name:var(--font-display)] text-lg font-bold tabular-nums text-[var(--color-gold)]">
           {pts}
-          <span className="ml-0.5 text-[9px] font-semibold text-[var(--color-muted)]">
+          <span className="ml-0.5 text-[10px] font-semibold text-[var(--color-muted)]">
             pts
           </span>
         </span>
@@ -279,7 +279,7 @@ export function MatchCardInteractive({
               Points en jeu
             </p>
           )}
-          <div className="flex items-stretch gap-2">
+          <div className="flex items-stretch gap-1 rounded-2xl bg-[var(--color-surface-2)] p-2">
             <OutcomeColumn
               flag={match.homeFlag}
               name={match.homeTeam}
