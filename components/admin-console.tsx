@@ -716,6 +716,26 @@ function OddsPanel({ matches }: { matches: AdminMatchResult[] }) {
       }
     });
 
+  // Capture immédiate de toutes les cotes depuis l'API (force un snapshot).
+  const syncAll = () =>
+    start(async () => {
+      try {
+        const res = await fetch("/api/admin/odds/sync", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Erreur");
+        flash(
+          `✓ ${data.updated} match(s) coté(s)` +
+            (data.unmatchedSoon?.length
+              ? ` · ${data.unmatchedSoon.length} sans cote`
+              : ""),
+          true
+        );
+        router.refresh();
+      } catch (e) {
+        flash(e instanceof Error ? e.message : "Erreur", false);
+      }
+    });
+
   const oddInput = (
     label: string,
     value: string,
@@ -738,11 +758,22 @@ function OddsPanel({ matches }: { matches: AdminMatchResult[] }) {
   return (
     <Card>
       <CardContent className="p-4">
-        <CardTitle className="text-base">🎲 Cotes manuelles</CardTitle>
+        <CardTitle className="text-base">🎲 Cotes</CardTitle>
         <p className="mt-1 mb-3 text-sm text-[var(--color-muted)]">
-          Saisis les cotes 1X2 d&apos;un match (backfill des matchs joués avant la
-          capture auto). Si le match est terminé, les points sont recalculés.
+          Synchronise toutes les cotes depuis l&apos;API, ou saisis-les à la main
+          (backfill). Un match terminé voit ses points recalculés.
         </p>
+
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={syncAll}
+          disabled={pending}
+          className="mb-4"
+        >
+          {pending ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+          Synchroniser toutes les cotes
+        </Button>
 
         {matches.length === 0 ? (
           <p className="text-sm text-[var(--color-muted)]">
