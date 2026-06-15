@@ -83,3 +83,8 @@ const NAME_TO_CODE: Record<string, string> = {
 export function countryCode(name: string): string {
   return NAME_TO_CODE[name] ?? "";
 }
+
+/** Tous les codes drapeaux utilisés (uniques, triés) — pour le pré-téléchargement. */
+export const FLAG_CODES: string[] = [
+  ...new Set(Object.values(NAME_TO_CODE)),
+].sort();

@@ -12,7 +12,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "sync": "tsx --env-file=.env scripts/sync.ts",
-    "rescore": "tsx --env-file=.env scripts/rescore.ts"
+    "rescore": "tsx --env-file=.env scripts/rescore.ts",
+    "flags": "tsx scripts/fetch-flags.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

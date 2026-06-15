@@ -4,8 +4,9 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Drapeau d'une nation, rendu en image (flagcdn.com) — compatible PC, iOS et
- * Android (contrairement aux emojis drapeaux, non rendus sous Windows).
+ * Drapeau d'une nation, rendu en image servie en local (public/flags) avec
+ * repli flagcdn.com — compatible PC, iOS et Android (contrairement aux emojis
+ * drapeaux, non rendus sous Windows). Pré-télécharger via `npm run flags`.
  *
  * `code` est un code flagcdn (ex. "fr", "gb-eng"). Vide → drapeau neutre.
  * La taille se contrôle via `className` (ex. "h-6 w-8").
@@ -34,13 +35,13 @@ export function Flag({
     );
   }
 
-  // Cache-bust à partir du 1er échec pour forcer une nouvelle requête réseau
-  // (jusqu'à 2 essais supplémentaires), sinon le navigateur resservirait
-  // l'échec mis en cache.
+  // Local d'abord (public/flags) pour éviter toute requête réseau ; repli sur
+  // flagcdn.com si le fichier local manque (pré-téléchargement non lancé ou
+  // code non couvert), avec cache-bust au 2e échec.
   const src =
     attempt === 0
-      ? `https://flagcdn.com/${code}.svg`
-      : `https://flagcdn.com/${code}.svg?retry=${attempt}`;
+      ? `/flags/${code}.svg`
+      : `https://flagcdn.com/${code}.svg${attempt > 1 ? `?retry=${attempt}` : ""}`;
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
