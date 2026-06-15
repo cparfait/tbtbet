@@ -77,6 +77,8 @@ Les points d'un **bon résultat** suivent la difficulté du match : **`R`** vaut
 - **[Tailwind CSS 4](https://tailwindcss.com/)** — design system maison, dark mode
 - **[web-push](https://github.com/web-push-libs/web-push)** — notifications PWA (VAPID)
 - **[football-data.org](https://www.football-data.org/)** — source des matchs & scores (palier gratuit)
+- **[The Odds API](https://the-odds-api.com/)** — cotes 1X2 pour le barème « façon MPP » (palier gratuit)
+- **[Vitest](https://vitest.dev/)** — tests unitaires du barème
 
 ## 🚀 Démarrage
 
@@ -121,6 +123,8 @@ npm run dev                  # http://localhost:3000
 | `npm run db:studio` | Prisma Studio |
 | `npm run sync` | Sync manuelle des matchs |
 | `npm run rescore` | Recalcule tous les points (après changement de barème) |
+| `npm run flags` | Pré-télécharge les drapeaux dans `public/flags/` |
+| `npm test` | Lance les tests unitaires (Vitest) |
 
 ## ⚙️ Sous le capot
 

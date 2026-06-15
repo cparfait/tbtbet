@@ -106,21 +106,6 @@ export function impliedProbabilities(m: OddsMatch): {
   };
 }
 
-/** Étiquette de difficulté d'une issue (juste pour le visuel / la couleur). */
-export type Tier = {
-  label: string;
-  /** Couleur d'accent (variable CSS) pour l'UI. */
-  accent: string;
-};
-
-export function outcomeTier(probPct: number): Tier {
-  if (probPct >= 50) return { label: "Favori", accent: "var(--color-muted)" };
-  if (probPct >= 33)
-    return { label: "Équilibré", accent: "var(--color-pitch-bright)" };
-  if (probPct >= 18) return { label: "Outsider", accent: "var(--color-gold)" };
-  return { label: "Gros outsider", accent: "var(--color-gold-bright)" };
-}
-
 /**
  * Points pour un BON RÉSULTAT selon la proba implicite de l'issue choisie.
  * Courbe douce bornée ~1–6 : plus l'issue est improbable, plus ça rapporte.
