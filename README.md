@@ -37,17 +37,21 @@ Pas de données bidon : les matchs et scores viennent en direct de l'API **footb
 - 📲 **Notifications push** — résultat tombé, tu t'es fait doubler, récap… directement sur ton téléphone.
 - 📊 **Classements des poules** — le tableau officiel des groupes de la CdM.
 
-## 🧮 Le barème
+## 🧮 Le barème (façon MPP, indexé sur les cotes)
+
+Les points d'un **bon résultat** suivent la difficulté du match : **`R`** vaut de **1 pt** (grand favori) à **6 pts** (gros exploit) selon la cote 1X2 figée avant le coup d'envoi. Plus l'issue est improbable, plus elle rapporte — l'audace paie.
 
 | Résultat | Points |
 |---|:---:|
-| 🎯 **Score exact** | **3 pts** |
-| ⚽ Bon vainqueur **+** bonne différence de buts (hors nul) | **2 pts** |
-| ✅ Bon sens du résultat (bon vainqueur ou bon nul) | **1 pt** |
+| 🎯 **Score exact** | **R × 2** |
+| ⚽ Bon vainqueur **+** bonne différence de buts (hors nul) | **R + 1** |
+| ✅ Bon sens du résultat (bon vainqueur ou bon nul) | **R** |
 | ❌ Mauvais pronostic | **0 pt** |
 | 🃏 Joker activé | **× 2** |
 
-> 🤓 *Subtilité sur les nuls : un nul a toujours une différence de buts nulle, donc le bonus « bonne diff » ne s'applique pas aux nuls — un nul bien vu mais au mauvais score vaut 1 pt (3 si exact).*
+> 🤓 *Subtilité sur les nuls : un nul a toujours une différence de buts nulle, donc le bonus « bonne diff » ne s'applique pas aux nuls — un nul bien vu mais au mauvais score vaut R (R × 2 si exact).*
+>
+> *Cotes via [The Odds API](https://the-odds-api.com) (palier gratuit), capturées ~toutes les 6 h jusqu'au coup d'envoi puis figées (closing odds), identiques pour tous. Match sans cote → repli sur le barème classique 3 / 2 / 1.*
 
 ## 🎖️ Les badges
 
@@ -100,6 +104,8 @@ npm run dev                  # http://localhost:3000
 | `DATABASE_URL` / `DIRECT_URL` | Postgres |
 | `FOOTBALL_DATA_TOKEN` | Token [football-data.org](https://www.football-data.org/client/register) (gratuit) |
 | `FOOTBALL_DATA_COMPETITION` | Compétition à synchroniser (défaut `WC`) |
+| `ODDS_API_KEY` | Clé [The Odds API](https://the-odds-api.com) (gratuit) pour le barème aux cotes — sans elle, repli barème classique |
+| `ODDS_API_SPORT` / `ODDS_API_REGION` | Sport (défaut `soccer_fifa_world_cup`) et région bookmakers (défaut `eu`) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Compte admin créé au démarrage |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Push (`npx web-push generate-vapid-keys`) |
 | `SYNC_LIVE_SECONDS` / `SYNC_IDLE_MINUTES` | Rythme de sync (défaut 90 s / 30 min) |

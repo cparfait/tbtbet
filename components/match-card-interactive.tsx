@@ -18,6 +18,7 @@ import { Card } from "./ui/card";
 import { Flag } from "./flag";
 import { cn, formatKickoffTime } from "@/lib/utils";
 import { computePoints } from "@/lib/scoring";
+import { outcomeResultPoints } from "@/lib/odds";
 import { STAGE_LABELS, type Match } from "@/lib/data/matches";
 
 type Props = {
@@ -119,7 +120,8 @@ export function MatchCardInteractive({
       ? computePoints(
           { homeScore: prediction.homeScore, awayScore: prediction.awayScore },
           { homeScore: refScore.homeScore, awayScore: refScore.awayScore },
-          prediction.joker
+          prediction.joker,
+          match.odds
         ).points
       : null;
 
@@ -241,6 +243,19 @@ export function MatchCardInteractive({
       ) : (
         /* ── Pronostic inline ── */
         <div className="space-y-2.5">
+          {match.odds && (
+            <div>
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+                Points en jeu
+              </p>
+              <div className="flex items-stretch gap-1.5">
+                <OutcomePts flag={match.homeFlag} pts={outcomeResultPoints(match.odds, 1)} />
+                <OutcomePts label="Nul" pts={outcomeResultPoints(match.odds, 0)} />
+                <OutcomePts flag={match.awayFlag} pts={outcomeResultPoints(match.odds, -1)} />
+              </div>
+            </div>
+          )}
+
           <ScoreStepper
             flag={match.homeFlag}
             name={match.homeTeam}
@@ -330,6 +345,35 @@ export function MatchCardInteractive({
         </div>
       )}
     </Card>
+  );
+}
+
+/** Mini-colonne « points en jeu » pour une issue (drapeau/Nul + points dorés). */
+function OutcomePts({
+  flag,
+  label,
+  pts,
+}: {
+  flag?: string;
+  label?: string;
+  pts: number | null;
+}) {
+  return (
+    <div className="flex flex-1 flex-col items-center gap-1 rounded-lg bg-[var(--color-surface-2)] py-1.5">
+      {flag ? (
+        <Flag code={flag} className="h-4 w-6" />
+      ) : (
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+          {label}
+        </span>
+      )}
+      <span className="font-[family-name:var(--font-display)] text-sm font-bold tabular-nums text-[var(--color-gold)]">
+        {pts ?? "—"}
+        <span className="ml-0.5 text-[9px] font-semibold text-[var(--color-muted)]">
+          pts
+        </span>
+      </span>
+    </div>
   );
 }
 

@@ -13,15 +13,15 @@ const RULES = [
   {
     emoji: "🎯",
     title: "Score exact",
-    points: "3 pts",
-    desc: "Le score parfait, au but près.",
-    example: "Tu pronostiques 2-1, le match finit 2-1.",
+    points: "R × 2",
+    desc: "Le score parfait, au but près — double les points du résultat.",
+    example: "Bon résultat à 4 pts + score exact → 8 pts. Le jackpot sur un outsider !",
     color: "border-[var(--color-gold)]/30 bg-[var(--color-gold)]/[0.05]",
   },
   {
     emoji: "⚽",
     title: "Bon vainqueur + bonne différence de buts",
-    points: "2 pts",
+    points: "R + 1",
     desc: "Le bon gagnant avec le bon écart (hors nul).",
     example: "Tu pronostiques 3-1, le match finit 2-0. Même vainqueur, même écart de 2.",
     color: "border-[var(--color-pitch)]/25 bg-[var(--color-pitch)]/[0.04]",
@@ -29,7 +29,7 @@ const RULES = [
   {
     emoji: "✅",
     title: "Bon sens du résultat",
-    points: "1 pt",
+    points: "R",
     desc: "Le bon vainqueur, ou le bon nul — mais pas le bon score.",
     example: "Tu pronostiques 1-0, le match finit 3-0. Bon vainqueur, mauvais score.",
     color: "border-[var(--color-border-subtle)] bg-[var(--color-surface-2)]",
@@ -59,7 +59,8 @@ export default async function ScoringPage() {
       const { points } = computePoints(
         { homeScore: pred.homeScore, awayScore: pred.awayScore },
         pred.match.result,
-        pred.joker
+        pred.joker,
+        pred.match.odds
       );
       return { pred, points };
     })
@@ -166,6 +167,19 @@ export default async function ScoringPage() {
         Calcul des points
       </h2>
 
+      {/* ── R : les points du résultat suivent la cote ── */}
+      <Card className="glass mb-4 border-[var(--color-pitch)]/25 bg-[var(--color-pitch)]/[0.04] p-4">
+        <p className="text-sm leading-relaxed text-[var(--color-cream)]">
+          <strong className="text-[var(--color-pitch-bright)]">R = les points d&apos;un bon résultat.</strong>{" "}
+          Ils suivent la difficulté du match :{" "}
+          <strong className="text-[var(--color-cream)]">de 1 pt</strong> pour un
+          grand favori à <strong className="text-[var(--color-cream)]">6 pts</strong>{" "}
+          pour un gros exploit. Plus l&apos;issue est improbable, plus elle
+          rapporte — l&apos;audace paie. Les points en jeu sont affichés sur
+          chaque match avant le coup d&apos;envoi.
+        </p>
+      </Card>
+
       <div className="mb-6 flex flex-col gap-3">
         {RULES.map((rule) => (
           <Card key={rule.title} className={`p-4 ${rule.color}`}>
@@ -196,9 +210,13 @@ export default async function ScoringPage() {
       <Card className="glass mb-6 p-4">
         <p className="text-sm leading-relaxed text-[var(--color-muted)]">
           <strong className="text-[var(--color-cream)]">Note sur les nuls :</strong>{" "}
-          un match nul a toujours une différence de buts nulle. Le bonus de 2 pts
-          ne s&apos;applique donc pas aux nuls — un nul bien vu mais au mauvais
-          score rapporte 1 pt (et 3 si le score est exact).
+          un match nul a toujours une différence de buts nulle. Le bonus «&nbsp;bonne
+          différence&nbsp;» (R + 1) ne s&apos;applique donc pas aux nuls — un nul bien
+          vu mais au mauvais score rapporte R (et R × 2 si le score est exact).
+        </p>
+        <p className="mt-2 text-xs leading-relaxed text-[var(--color-muted)]">
+          Et si les cotes d&apos;un match ne sont pas disponibles, on retombe sur
+          le barème classique : 3 / 2 / 1 pt.
         </p>
       </Card>
 
@@ -253,9 +271,10 @@ export default async function ScoringPage() {
           💡 Exemple
         </h3>
         <p className="text-sm leading-relaxed text-[var(--color-muted)]">
-          Tu pronostiques <strong className="text-[var(--color-cream)]">2-1</strong> avec
-          un joker, et le match finit <strong className="text-[var(--color-cream)]">2-1</strong>.
-          Score exact : <strong className="text-[var(--color-gold)]">3 pts × 2 = 6 pts</strong> 🎉
+          Tu oses la victoire d&apos;un outsider (résultat à{" "}
+          <strong className="text-[var(--color-cream)]">5 pts</strong>) et tu trouves
+          le score exact <strong className="text-[var(--color-cream)]">2-1</strong>{" "}
+          avec un joker : <strong className="text-[var(--color-gold)]">5 × 2 (exact) × 2 (joker) = 20 pts</strong> 🎉
         </p>
       </Card>
     </>
