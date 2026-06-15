@@ -9,6 +9,7 @@ import { Flag } from "@/components/flag";
 import { Card } from "@/components/ui/card";
 import { LiveRefresher } from "@/components/live-refresher";
 import { HomeOnboarding } from "@/components/home-onboarding";
+import { OddsAnnouncement } from "@/components/odds-announcement";
 import { GroupSwitcher } from "@/components/group-switcher";
 import {
   getLiveLeaderboard,
@@ -140,6 +141,7 @@ export default async function DashboardPage() {
       </div>
 
       <HomeOnboarding />
+      <OddsAnnouncement />
 
       <ChampionPickCard
         pick={championPick}
