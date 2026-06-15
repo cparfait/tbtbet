@@ -79,6 +79,13 @@ model Match {
   group       String?
   matchday    Int? // numéro de journée (pour le joker / filtres)
   externalId  Int? // id API-Football
+  // Cotes 1X2 figées (The Odds API) — servent au scoring « façon MPP » : plus
+  // l'issue est improbable, plus le bon résultat rapporte. Capturées ~toutes
+  // les 6 h jusqu'au coup d'envoi, puis figées (closing odds).
+  oddsHome       Float?
+  oddsDraw       Float?
+  oddsAway       Float?
+  oddsCapturedAt DateTime?
   predictions Prediction[]
   result      Result?
 

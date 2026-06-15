@@ -19,8 +19,12 @@ export async function register() {
   const liveSeconds = Math.max(30, Number(process.env.SYNC_LIVE_SECONDS ?? 90));
   const idleMinutes = Math.max(1, Number(process.env.SYNC_IDLE_MINUTES ?? 30));
 
-  const [{ syncMatches, hasActiveMatchWindow }, { maybeInit }] =
-    await Promise.all([import("./lib/football-data"), import("./lib/init")]);
+  const [{ syncMatches, hasActiveMatchWindow }, { maybeInit }, { maybeSnapshotOdds }] =
+    await Promise.all([
+      import("./lib/football-data"),
+      import("./lib/init"),
+      import("./lib/odds-sync"),
+    ]);
 
   const port = process.env.PORT ?? "3000";
   const notifyUrl = `http://127.0.0.1:${port}/api/internal/notify-results`;
@@ -31,6 +35,8 @@ export async function register() {
       if (r.results > 0) {
         console.log(`[auto-sync] ✓ ${r.matches} matchs, ${r.results} résultats`);
       }
+      // Snapshot des cotes (auto-throttlé à 6 h, no-op sans match à venir).
+      await maybeSnapshotOdds().catch(() => {});
       // Notifs « résultat tombé » via la route node dédiée (fetch, pas
       // d'import → web-push reste hors du bundle edge de l'instrumentation).
       if (process.env.AUTH_SECRET) {

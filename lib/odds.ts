@@ -132,6 +132,39 @@ export function resultPoints(probPct: number): number {
   return Math.round(1 + 5 * (1 - p));
 }
 
+/** Cotes 1X2 décimales d'un match (telles que stockées sur `Match`). */
+export type Odds1x2 = { home: number; draw: number; away: number };
+
+/** Cotes telles que lues en base : chaque champ peut être absent/null. */
+export type OddsInput = {
+  home?: number | null;
+  draw?: number | null;
+  away?: number | null;
+};
+
+/**
+ * Points « bon résultat » (R) pour une issue, déduits des cotes 1X2.
+ * `outcome` : 1 = victoire domicile, 0 = nul, -1 = victoire extérieur.
+ * Renvoie `null` si les cotes sont absentes/invalides → l'appelant retombe sur
+ * le barème historique.
+ */
+export function outcomeResultPoints(
+  odds: OddsInput | null | undefined,
+  outcome: -1 | 0 | 1
+): number | null {
+  const home = odds?.home;
+  const draw = odds?.draw;
+  const away = odds?.away;
+  if (!home || !draw || !away || home <= 1 || draw <= 1 || away <= 1) return null;
+  const rHome = 1 / home;
+  const rDraw = 1 / draw;
+  const rAway = 1 / away;
+  const total = rHome + rDraw + rAway;
+  const p =
+    outcome === 1 ? rHome / total : outcome === 0 ? rDraw / total : rAway / total;
+  return resultPoints(p * 100);
+}
+
 /** Jeu d'exemple (sans clé API) — quelques affiches Coupe du Monde. */
 export const SAMPLE_ODDS: OddsMatch[] = [
   {

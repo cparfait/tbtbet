@@ -364,13 +364,23 @@ export async function applyMatchResult(
 
   const preds = await prisma.prediction.findMany({ where: { matchId } });
 
+  // Cotes figées de ce match (barème « façon MPP ») — null si absentes (repli).
+  const matchOdds = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: { oddsHome: true, oddsDraw: true, oddsAway: true },
+  });
+  const odds = matchOdds
+    ? { home: matchOdds.oddsHome, draw: matchOdds.oddsDraw, away: matchOdds.oddsAway }
+    : null;
+
   // Ce résultat change-t-il réellement quelque chose ? (nouveau résultat ou
   // points d'au moins un prono différents de ce qui est déjà crédité)
   const changed = preds.some((p) => {
     const pts = computePoints(
       { homeScore: p.homeScore, awayScore: p.awayScore },
       { homeScore, awayScore },
-      p.joker
+      p.joker,
+      odds
     ).points;
     return p.pointsAwarded !== pts;
   });
@@ -400,7 +410,8 @@ export async function applyMatchResult(
         const { points } = computePoints(
           { homeScore: pred.homeScore, awayScore: pred.awayScore },
           { homeScore, awayScore },
-          pred.joker
+          pred.joker,
+          odds
         );
         if (pred.pointsAwarded !== points) {
           await tx.prediction.update({
@@ -443,7 +454,12 @@ export async function applyMatchResult(
           const b = computePoints(
             { homeScore: up.homeScore, awayScore: up.awayScore },
             { homeScore: r.homeScore, awayScore: r.awayScore },
-            up.joker
+            up.joker,
+            {
+              home: up.match.oddsHome,
+              draw: up.match.oddsDraw,
+              away: up.match.oddsAway,
+            }
           );
           points += b.points;
           if (b.exactScore) exactScores++;

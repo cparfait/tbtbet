@@ -77,7 +77,8 @@ export async function postMatchRecaps(matchId: string): Promise<void> {
     const b = computePoints(
       { homeScore: p.homeScore, awayScore: p.awayScore },
       { homeScore: result.homeScore, awayScore: result.awayScore },
-      p.joker
+      p.joker,
+      { home: match.oddsHome, draw: match.oddsDraw, away: match.oddsAway }
     );
     breakdown.set(p.userId, {
       points: b.points,

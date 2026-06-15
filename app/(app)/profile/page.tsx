@@ -69,7 +69,8 @@ export default async function ProfilePage() {
     return computePoints(
       { homeScore: pred.homeScore, awayScore: pred.awayScore },
       pred.match.result,
-      pred.joker
+      pred.joker,
+      pred.match.odds
     ).points;
   }
 

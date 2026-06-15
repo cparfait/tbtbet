@@ -33,6 +33,9 @@ type DbMatch = {
   stage: Match["stage"];
   group: string | null;
   matchday: number | null;
+  oddsHome: number | null;
+  oddsDraw: number | null;
+  oddsAway: number | null;
   result: { homeScore: number; awayScore: number; status: string } | null;
 };
 
@@ -48,6 +51,10 @@ function toUiMatch(m: DbMatch): Match {
     stage: m.stage,
     group: m.group,
     matchday: m.matchday,
+    odds:
+      m.oddsHome != null && m.oddsDraw != null && m.oddsAway != null
+        ? { home: m.oddsHome, draw: m.oddsDraw, away: m.oddsAway }
+        : null,
     result:
       m.result && m.result.status === "FINISHED"
         ? {
@@ -196,7 +203,8 @@ export async function getPersonalStats(userId: string): Promise<PersonalStats> {
         const b = computePoints(
           { homeScore: p.homeScore, awayScore: p.awayScore },
           { homeScore: r.homeScore, awayScore: r.awayScore },
-          p.joker
+          p.joker,
+          { home: p.match.oddsHome, draw: p.match.oddsDraw, away: p.match.oddsAway }
         );
         points += b.points;
         if (b.exactScore) exactScores++;
@@ -500,7 +508,8 @@ export async function getLiveLeaderboard(memberIds?: string[]): Promise<{
         const pts = computePoints(
           { homeScore: p.homeScore, awayScore: p.awayScore },
           { homeScore: r.homeScore, awayScore: r.awayScore },
-          p.joker
+          p.joker,
+          { home: r.match.oddsHome, draw: r.match.oddsDraw, away: r.match.oddsAway }
         ).points;
         provisional.set(p.userId, (provisional.get(p.userId) ?? 0) + pts);
       }
@@ -611,7 +620,8 @@ export async function getMatchPredictions(
           ? computePoints(
               { homeScore: p.homeScore, awayScore: p.awayScore },
               { homeScore: result!.homeScore, awayScore: result!.awayScore },
-              p.joker
+              p.joker,
+              { home: match?.oddsHome, draw: match?.oddsDraw, away: match?.oddsAway }
             ).points
           : null,
         live: !!live,
@@ -673,7 +683,8 @@ export async function getPredictionComparison(
           ? computePoints(
               { homeScore: p.homeScore, awayScore: p.awayScore },
               { homeScore: r!.homeScore, awayScore: r!.awayScore },
-              p.joker
+              p.joker,
+              { home: m.oddsHome, draw: m.oddsDraw, away: m.oddsAway }
             ).points
           : null;
       const tp = targetByMatch.get(m.id);

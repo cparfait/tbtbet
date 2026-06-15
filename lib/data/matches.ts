@@ -40,6 +40,8 @@ export type Match = {
   result?: { homeScore: number; awayScore: number; status: "FINISHED" };
   /** Score en direct (match en cours) — non crédité tant que pas terminé. */
   live?: { homeScore: number; awayScore: number };
+  /** Cotes 1X2 figées (pour afficher les points par issue) — null si absentes. */
+  odds?: { home: number; draw: number; away: number } | null;
 };
 
 /** Ligne de classement d'un groupe. */
