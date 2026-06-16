@@ -531,6 +531,18 @@ export async function getLiveLeaderboard(memberIds?: string[]): Promise<{
       .sort(compareRanked)
       .forEach((e, i) => committedRank.set(e.userId, i + 1));
 
+    // Rang « précédent » RAMENÉ AU GROUPE. `Score.previousRank` est un rang
+    // GLOBAL (tous joueurs) ; l'utiliser tel quel face à un rang de groupe
+    // donnait des évolutions fantaisistes (« +13 » pour un 15ᵉ global mais 2ᵉ
+    // de son groupe). On reclasse les membres selon leur rang global figé :
+    // l'ordre global restreint au groupe = l'ordre intra-groupe du snapshot
+    // précédent (même comparateur), renuméroté 1..N.
+    const previousGroupRank = new Map<string, number>();
+    users
+      .filter((u) => u.score?.previousRank != null)
+      .sort((a, b) => a.score!.previousRank! - b.score!.previousRank!)
+      .forEach((u, i) => previousGroupRank.set(u.id, i + 1));
+
     const entries = users
       .map((u) => {
         const points = u.score?.points ?? 0;
@@ -545,7 +557,6 @@ export async function getLiveLeaderboard(memberIds?: string[]): Promise<{
           exactScores: u.score?.exactScores ?? 0,
           correctResults: u.score?.correctResults ?? 0,
           badges: u.badges.map((b) => b.badge.key),
-          previousRank: u.score?.previousRank ?? null,
           championFlag: u.championPick?.flag ?? null,
         };
       })
@@ -555,10 +566,9 @@ export async function getLiveLeaderboard(memberIds?: string[]): Promise<{
       )
       .map((e, i) => ({
         rank: i + 1,
-        evolution:
-          e.previousRank != null
-            ? e.previousRank - (committedRank.get(e.userId) ?? i + 1)
-            : null,
+        evolution: previousGroupRank.has(e.userId)
+          ? previousGroupRank.get(e.userId)! - (committedRank.get(e.userId) ?? i + 1)
+          : null,
         userId: e.userId,
         name: e.name,
         email: e.email,
