@@ -2,7 +2,7 @@
  * Comparateur de classement UNIQUE de DaronsFC.
  *
  * Départage : points → scores exacts → bons résultats → nom (ordre stable).
- * Utilisé par le classement général, le classement live, le snapshot des rangs
+ * Utilisé par le classement de groupe, le classement live, le snapshot des rangs
  * (flèches ▲▼) et les notifications « tu t'es fait doublé » — une seule
  * définition pour éviter que deux écrans classent différemment à égalité.
  */

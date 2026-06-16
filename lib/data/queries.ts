@@ -13,7 +13,6 @@ import { jokerPhase, JOKER_BUDGET } from "@/lib/jokers";
 import type {
   Match,
   StandingTeam,
-  LeaderboardEntry,
   LiveLeaderboardEntry,
   MatchPrediction,
   ComparisonRow,
@@ -436,58 +435,22 @@ export async function getStandings(): Promise<Record<string, StandingTeam[]>> {
 }
 
 /**
- * Classement général : TOUS les joueurs (y compris ceux sans encore de points,
- * notamment les comptes Google qui n'ont pas de ligne `Score` à l'inscription).
- * Les bannis sont exclus.
- */
-export async function getLeaderboard(
-  memberIds?: string[]
-): Promise<LeaderboardEntry[]> {
-  try {
-    if (memberIds && memberIds.length === 0) return [];
-    const users = await prisma.user.findMany({
-      where: {
-        banned: false,
-        ...(memberIds ? { id: { in: memberIds } } : {}),
-      },
-      include: {
-        score: true,
-        badges: { include: { badge: true } },
-      },
-    });
-
-    return users
-      .map((u) => ({
-        name: u.name ?? "Anonyme",
-        email: u.email,
-        points: u.score?.points ?? 0,
-        exactScores: u.score?.exactScores ?? 0,
-        correctResults: u.score?.correctResults ?? 0,
-        badges: u.badges.map((b) => b.badge.key),
-      }))
-      .sort(compareRanked)
-      .map((entry, i) => ({ rank: i + 1, ...entry }));
-  } catch {
-    return [];
-  }
-}
-
-/**
  * Classement LIVE : points acquis + points PROVISOIRES des matchs en cours
  * (statut LIVE), recalculés à la volée. Renvoie aussi l'évolution ▲▼ de
  * chaque joueur (vs le dernier match terminé) et un drapeau `hasLive`.
  */
-export async function getLiveLeaderboard(memberIds?: string[]): Promise<{
+export async function getLiveLeaderboard(memberIds: string[]): Promise<{
   entries: LiveLeaderboardEntry[];
   hasLive: boolean;
 }> {
   try {
-    if (memberIds && memberIds.length === 0) return { entries: [], hasLive: false };
+    // Le classement est TOUJOURS scopé à un groupe : pas de classement global.
+    if (memberIds.length === 0) return { entries: [], hasLive: false };
     const [users, liveResults] = await Promise.all([
       prisma.user.findMany({
         where: {
           banned: false,
-          ...(memberIds ? { id: { in: memberIds } } : {}),
+          id: { in: memberIds },
         },
         include: {
           score: true,

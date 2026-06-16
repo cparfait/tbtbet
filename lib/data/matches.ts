@@ -57,17 +57,6 @@ export type StandingTeam = {
   pts: number;
 };
 
-/** Entrée du classement général des joueurs. */
-export type LeaderboardEntry = {
-  rank: number;
-  name: string;
-  email: string;
-  points: number;
-  exactScores: number;
-  correctResults: number;
-  badges: string[];
-};
-
 /** Entrée du classement LIVE (points acquis + points provisoires en cours). */
 export type LiveLeaderboardEntry = {
   rank: number;
