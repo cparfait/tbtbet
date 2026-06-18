@@ -181,3 +181,38 @@ export async function getGroupMemberIds(groupId: string): Promise<string[]> {
     return [];
   }
 }
+
+/**
+ * Ids de TOUS les joueurs non bannis (pour le classement général de l'appli).
+ * On exclut le compte système (bot) et les admins peuvent voir tout le monde.
+ */
+export async function getAllPlayerIds(): Promise<string[]> {
+  try {
+    const users = await prisma.user.findMany({
+      where: { banned: false },
+      select: { id: true },
+    });
+    return users.map((u) => u.id);
+  } catch {
+    return [];
+  }
+}
+
+/** Noms des groupes publics d'un joueur (pour affichage sur sa fiche). */
+export async function getUserPublicGroups(
+  userId: string
+): Promise<{ id: string; name: string }[]> {
+  try {
+    const memberships = await prisma.groupMember.findMany({
+      where: { userId },
+      include: { group: { select: { id: true, name: true } } },
+      orderBy: { joinedAt: "asc" },
+    });
+    return memberships.map((m) => ({
+      id: m.group.id,
+      name: m.group.name,
+    }));
+  } catch {
+    return [];
+  }
+}

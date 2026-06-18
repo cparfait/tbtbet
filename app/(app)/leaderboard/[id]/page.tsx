@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Radio } from "lucide-react";
+import { ArrowLeft, Radio, Users } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
@@ -122,6 +122,26 @@ export default async function ComparePage({
             </span>
           ))}
         </div>
+      )}
+
+      {/* ── Groupes du joueur ── */}
+      {data.targetGroups.length > 0 && (
+        <Card className="glass mb-5 p-4">
+          <p className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--color-muted)]">
+            <Users className="size-3.5" />
+            {isSelf ? "Tes groupes" : `Groupes de ${data.targetName}`}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {data.targetGroups.map((g) => (
+              <span
+                key={g.id}
+                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-surface-2)] px-3 py-1 text-xs font-medium text-[var(--color-cream)]"
+              >
+                {g.name}
+              </span>
+            ))}
+          </div>
+        </Card>
       )}
       {data.rows.length === 0 && (
         <Card className="glass p-8 text-center">

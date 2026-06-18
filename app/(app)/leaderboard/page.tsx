@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowUp, ArrowDown, Minus, Radio, ChevronRight } from "lucide-react";
+import { ArrowUp, ArrowDown, Minus, Radio, ChevronRight, Globe } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import {
   getSwitchableGroups,
   getGroupMemberIds,
   requireActiveGroup,
+  getAllPlayerIds,
 } from "@/lib/groups";
 
 export const metadata = { title: "Classement · DaronsFC" };
@@ -20,19 +21,28 @@ export const dynamic = "force-dynamic";
 
 const MEDALS = ["\u{1F947}", "\u{1F948}", "\u{1F949}"];
 
-export default async function LeaderboardPage() {
+export default async function LeaderboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ scope?: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const userId = session.user.id;
 
+  const { scope } = await searchParams;
+  const isGlobal = scope === "global";
+
   const activeGroup = await requireActiveGroup(userId);
   const [myGroups, memberIds] = await Promise.all([
     getSwitchableGroups(userId, session.user.role === "ADMIN"),
-    getGroupMemberIds(activeGroup.id),
+    isGlobal ? getAllPlayerIds() : getGroupMemberIds(activeGroup.id),
   ]);
 
   const { entries, hasLive } = await getLiveLeaderboard(memberIds);
   const top3 = entries.slice(0, 3);
+
+  const scopeLabel = isGlobal ? "Tous les joueurs" : activeGroup.name;
 
   return (
     <>
@@ -40,7 +50,7 @@ export default async function LeaderboardPage() {
 
       <PageHeader
         title="Classement"
-        subtitle={activeGroup.name}
+        subtitle={scopeLabel}
         action={
           hasLive ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-red-400">
@@ -51,11 +61,37 @@ export default async function LeaderboardPage() {
         }
       />
 
-      <div className="mb-5 flex items-center justify-between gap-2">
-        <span className="text-xs font-medium uppercase tracking-widest text-[var(--color-muted)]">
-          Groupe
-        </span>
-        <GroupSwitcher groups={myGroups} activeId={activeGroup.id} />
+      {/* ── Toggle Mon groupe / Classement général ── */}
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <div className="inline-flex rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] p-0.5 text-xs font-semibold">
+          <Link
+            href="/leaderboard"
+            className={cn(
+              "rounded-full px-3 py-1.5 transition-colors",
+              !isGlobal
+                ? "bg-[var(--color-pitch)] text-white shadow-[0_0_12px_var(--color-pitch)]/25"
+                : "text-[var(--color-muted)] hover:text-[var(--color-cream)]"
+            )}
+          >
+            Mon groupe
+          </Link>
+          <Link
+            href="/leaderboard?scope=global"
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors",
+              isGlobal
+                ? "bg-[var(--color-pitch)] text-white shadow-[0_0_12px_var(--color-pitch)]/25"
+                : "text-[var(--color-muted)] hover:text-[var(--color-cream)]"
+            )}
+          >
+            <Globe className="size-3.5" />
+            Général
+          </Link>
+        </div>
+
+        {!isGlobal && (
+          <GroupSwitcher groups={myGroups} activeId={activeGroup.id} />
+        )}
       </div>
 
       {entries.length === 0 && (

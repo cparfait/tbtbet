@@ -612,7 +612,7 @@ export async function getMatchPredictions(
 export async function getPredictionComparison(
   viewerId: string,
   targetId: string
-): Promise<{ targetName: string; targetBadges: string[]; rows: ComparisonRow[] } | null> {
+): Promise<{ targetName: string; targetBadges: string[]; targetGroups: { id: string; name: string }[]; rows: ComparisonRow[] } | null> {
   try {
     const target = await prisma.user.findUnique({
       where: { id: targetId },
@@ -620,10 +620,15 @@ export async function getPredictionComparison(
     });
     if (!target) return null;
 
-    const [targetBadges] = await Promise.all([
+    const [targetBadges, targetGroups] = await Promise.all([
       prisma.userBadge.findMany({
         where: { userId: targetId },
         include: { badge: true },
+      }),
+      prisma.groupMember.findMany({
+        where: { userId: targetId },
+        include: { group: { select: { id: true, name: true } } },
+        orderBy: { joinedAt: "asc" },
       }),
     ]);
 
@@ -683,7 +688,15 @@ export async function getPredictionComparison(
       };
     });
 
-    return { targetName: target.name ?? "Anonyme", targetBadges: targetBadges.map((b) => b.badge.key), rows };
+    return {
+      targetName: target.name ?? "Anonyme",
+      targetBadges: targetBadges.map((b) => b.badge.key),
+      targetGroups: targetGroups.map((m) => ({
+        id: m.group.id,
+        name: m.group.name,
+      })),
+      rows,
+    };
   } catch {
     return null;
   }
