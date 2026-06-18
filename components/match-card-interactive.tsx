@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -54,7 +54,7 @@ function OutcomeColumn({
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center gap-2 px-0 py-2">
-      <Flag code={flag} className="h-8 w-12 shrink-0 drop-shadow" />
+      <Flag code={flag} team={name} className="h-8 w-12 shrink-0 drop-shadow" />
       <span className="w-full truncate text-center text-sm font-medium">{name}</span>
       {pts !== null && (
         <span className="font-[family-name:var(--font-display)] text-lg font-bold tabular-nums text-[var(--color-gold)]">
@@ -136,6 +136,14 @@ export function MatchCardInteractive({
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Suivi de la saisie PAR ÉQUIPE. On enregistre dès qu'un score est saisi,
+  // mais avec un délai adaptatif (cf. effet) : plus long tant qu'un côté reste
+  // à 0/non saisi, pour laisser le temps d'enchaîner sur la 2e équipe. Un prono
+  // existant est déjà « complet » → enregistrement immédiat de toute modif.
+  const [touchedHome, setTouchedHome] = useState(!!prediction);
+  const [touchedAway, setTouchedAway] = useState(!!prediction);
+  const anyScore = touchedHome || touchedAway;
+  const bothScores = touchedHome && touchedAway;
 
   const finished = match.result?.status === "FINISHED";
   const live = match.live;
@@ -186,6 +194,18 @@ export function MatchCardInteractive({
         setError(e instanceof Error ? e.message : "Erreur");
       }
     });
+
+  // Auto-enregistrement (anti-rebond) : dès que le joueur modifie son prono, on
+  // l'enregistre sans bouton « Valider ». Verrou au coup d'envoi via readOnly.
+  useEffect(() => {
+    if (readOnly || !anyScore || !dirty || pending) return;
+    // 2,5 s tant qu'un côté n'est pas saisi (largement le temps d'enchaîner sur
+    // le 2e score, qui vaut 0 par défaut), 0,7 s une fois les deux saisis.
+    const delay = bothScores ? 700 : 2500;
+    const t = setTimeout(save, delay);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [home, away, joker, comment, anyScore, bothScores, dirty, readOnly]);
 
   return (
     <Card className="p-4">
@@ -285,7 +305,10 @@ export function MatchCardInteractive({
               name={match.homeTeam}
               pts={match.odds ? outcomeResultPoints(match.odds, 1) : null}
               value={home}
-              onChange={setHome}
+              onChange={(v) => {
+                setHome(v);
+                setTouchedHome(true);
+              }}
               disabled={pending}
             />
             {match.odds && <DrawColumn pts={outcomeResultPoints(match.odds, 0)} />}
@@ -294,7 +317,10 @@ export function MatchCardInteractive({
               name={match.awayTeam}
               pts={match.odds ? outcomeResultPoints(match.odds, -1) : null}
               value={away}
-              onChange={setAway}
+              onChange={(v) => {
+                setAway(v);
+                setTouchedAway(true);
+              }}
               disabled={pending}
             />
           </div>
@@ -320,23 +346,28 @@ export function MatchCardInteractive({
               🃏 Joker ×2
             </button>
 
-            <button
-              type="button"
-              onClick={save}
-              disabled={pending || (!dirty && !!prediction)}
-              className="flex items-center gap-1.5 rounded-lg bg-[var(--color-pitch)] px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--color-pitch-bright)] disabled:opacity-40"
+            <span
+              className={cn(
+                "flex items-center gap-1.5 text-xs font-medium",
+                saved
+                  ? "text-[var(--color-pitch-bright)]"
+                  : "text-[var(--color-muted)]"
+              )}
             >
               {pending ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <>
+                  <Loader2 className="size-3.5 animate-spin" /> Enregistrement…
+                </>
               ) : saved ? (
-                <Check className="size-3.5" />
-              ) : null}
-              {saved
-                ? "Enregistré"
-                : prediction
-                  ? "Modifier"
-                  : "Valider"}
-            </button>
+                <>
+                  <Check className="size-3.5" /> Enregistré
+                </>
+              ) : prediction ? (
+                "Prono enregistré"
+              ) : (
+                "Auto-enregistré"
+              )}
+            </span>
           </div>
 
           {/* Commentaire (optionnel, visible des autres après le coup d'envoi) */}
@@ -390,7 +421,7 @@ function ReadOnlyRow({
   return (
     <div className="flex items-center justify-between">
       <div className="flex min-w-0 items-center gap-2">
-        <Flag code={flag} className="h-5 w-7 shrink-0" />
+        <Flag code={flag} team={name} className="h-5 w-7 shrink-0" />
         <span className="truncate text-sm font-medium">{name}</span>
       </div>
       {score !== undefined && (

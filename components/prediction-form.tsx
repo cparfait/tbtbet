@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Minus, Plus, Lock } from "lucide-react";
-import { Button } from "./ui/button";
+import { Minus, Plus, Lock, Loader2, Check } from "lucide-react";
 import { Flag } from "./flag";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +34,7 @@ function Stepper({
 }) {
   return (
     <div className="flex flex-1 flex-col items-center gap-2">
-      <Flag code={flag} className="h-7 w-10" />
+      <Flag code={flag} team={label} className="h-7 w-10" />
       <span className="max-w-24 truncate text-xs text-[var(--color-muted)]">
         {label}
       </span>
@@ -89,6 +88,20 @@ export function PredictionForm(props: Props) {
     "idle"
   );
   const [message, setMessage] = useState<string | null>(null);
+  // Suivi de la saisie PAR ÉQUIPE. On enregistre dès qu'un score est saisi,
+  // mais avec un délai adaptatif (cf. effet) : plus long tant qu'un côté reste
+  // à 0/non saisi, pour laisser le temps d'enchaîner sur la 2e équipe. Un prono
+  // existant est déjà « complet » → enregistrement immédiat de toute modif.
+  const [touchedHome, setTouchedHome] = useState(!!initial);
+  const [touchedAway, setTouchedAway] = useState(!!initial);
+  const anyScore = touchedHome || touchedAway;
+  const bothScores = touchedHome && touchedAway;
+
+  const dirty =
+    home !== (initial?.homeScore ?? 0) ||
+    away !== (initial?.awayScore ?? 0) ||
+    joker !== (initial?.joker ?? false) ||
+    comment.trim() !== (initial?.comment ?? "");
 
   async function submit() {
     setStatus("saving");
@@ -110,13 +123,24 @@ export function PredictionForm(props: Props) {
         throw new Error(body.error ?? "Échec de l'enregistrement.");
       }
       setStatus("saved");
-      setMessage("Pronostic verrouillé ✅");
       router.refresh();
     } catch (e) {
       setStatus("error");
       setMessage(e instanceof Error ? e.message : "Erreur inconnue.");
     }
   }
+
+  // Auto-enregistrement (anti-rebond) : le prono se sauvegarde dès qu'il change,
+  // sans bouton « Valider ». Verrou au coup d'envoi via `locked`.
+  useEffect(() => {
+    if (locked || !anyScore || !dirty || status === "saving") return;
+    // 2,5 s tant qu'un côté n'est pas saisi (largement le temps d'enchaîner sur
+    // le 2e score, qui vaut 0 par défaut), 0,7 s une fois les deux saisis.
+    const delay = bothScores ? 700 : 2500;
+    const t = setTimeout(submit, delay);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [home, away, joker, comment, anyScore, bothScores, dirty, locked]);
 
   if (locked) {
     return (
@@ -134,7 +158,10 @@ export function PredictionForm(props: Props) {
           label={props.homeTeam}
           flag={props.homeFlag}
           value={home}
-          onChange={setHome}
+          onChange={(v) => {
+            setHome(v);
+            setTouchedHome(true);
+          }}
           disabled={status === "saving"}
         />
         <span className="self-center pt-8 font-[family-name:var(--font-display)] text-2xl text-[var(--color-muted)]">
@@ -144,7 +171,10 @@ export function PredictionForm(props: Props) {
           label={props.awayTeam}
           flag={props.awayFlag}
           value={away}
-          onChange={setAway}
+          onChange={(v) => {
+            setAway(v);
+            setTouchedAway(true);
+          }}
           disabled={status === "saving"}
         />
       </div>
@@ -197,28 +227,28 @@ export function PredictionForm(props: Props) {
         className="mt-4 h-20 w-full resize-none rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] p-3 text-sm outline-none focus:border-[var(--color-pitch)]"
       />
 
-      <Button
-        onClick={submit}
-        disabled={status === "saving"}
-        size="lg"
-        className="mt-4 w-full"
-      >
-        {status === "saving"
-          ? "Enregistrement…"
-          : initial
-            ? "Modifier mon prono"
-            : "Valider mon prono"}
-      </Button>
+      <p className="mt-4 flex items-center justify-center gap-1.5 text-sm">
+        {status === "saving" ? (
+          <span className="flex items-center gap-1.5 text-[var(--color-muted)]">
+            <Loader2 className="size-4 animate-spin" /> Enregistrement…
+          </span>
+        ) : status === "saved" ? (
+          <span className="flex items-center gap-1.5 text-[var(--color-pitch-bright)]">
+            <Check className="size-4" /> Enregistré automatiquement
+          </span>
+        ) : initial ? (
+          <span className="text-[var(--color-muted)]">
+            Prono enregistré — modifie-le, ça se sauvegarde tout seul
+          </span>
+        ) : (
+          <span className="text-[var(--color-muted)]">
+            Ton prono s&apos;enregistre automatiquement
+          </span>
+        )}
+      </p>
 
-      {message && (
-        <p
-          className={cn(
-            "mt-3 text-center text-sm",
-            status === "error" ? "text-red-400" : "text-[var(--color-pitch-bright)]"
-          )}
-        >
-          {message}
-        </p>
+      {status === "error" && message && (
+        <p className="mt-3 text-center text-sm text-red-400">{message}</p>
       )}
     </div>
   );
