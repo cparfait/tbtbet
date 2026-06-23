@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🏓 TBT Bet
+# ⚽ TBT Bet
 
 ### Le tournoi de babyfoot interne Withings — parie, grimpe, deviens champion
 
@@ -46,7 +46,7 @@ Tout est saisi manuellement par l'admin (pas d'API externe).
 | Bracket — match croisé, équipe du Winner Bracket | **×1.5** |
 | + Joker activé | **× 2** (cumulé) |
 
-## 🏓 Format du tournoi
+## ⚽ Format du tournoi
 
 ### Phase de poules
 - 3 poules : **A** (3 équipes) · **B** (3 équipes) · **C** (4 équipes)
@@ -106,6 +106,6 @@ npm run dev                  # http://localhost:3000
 
 <div align="center">
 
-*Fait avec 🏓, du café et beaucoup de mauvaise foi entre collègues.*
+*Fait avec ⚽, du café et beaucoup de mauvaise foi entre collègues.*
 
 </div>
