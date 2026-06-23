@@ -1,131 +1,66 @@
-// ─────────────────────────────────────────────
-// Client « cotes » (The Odds API).
-//
-// Récupère les cotes 1X2 (marché « h2h ») d'une compétition et en déduit les
-// points « bon résultat » (resultPoints / outcomeResultPoints) du barème façon
-// MPP. La capture vers la base (snapshot) vit dans lib/odds-sync.
-//
-// Clé gratuite : https://the-odds-api.com (500 req/mois). Sans clé,
-// fetchLiveOdds renvoie null → le scoring retombe sur le barème classique.
-// ─────────────────────────────────────────────
+import type { BracketSource, MatchPhase } from "@/lib/generated/prisma";
 
-const BASE_URL = "https://api.the-odds-api.com/v4";
+export const DEFAULT_ODDS = 2;
+export const CROSS_LOSER_ODDS = 3;
+export const CROSS_WINNER_ODDS = 1.5;
+export const JOKER_MULTIPLIER = 2;
+export const WINS_PENALTY = 0.2;  // réduction par victoire (bracket seulement)
+export const ODDS_FLOOR = 1.2;    // cote minimum
 
-/** Clé de sport The Odds API (défaut : Coupe du Monde). Surchageable par env. */
-export const ODDS_SPORT = process.env.ODDS_API_SPORT ?? "soccer_fifa_world_cup";
-/** Région bookmakers (eu couvre bien les compétitions internationales). */
-export const ODDS_REGION = process.env.ODDS_API_REGION ?? "eu";
+function getBaseOdds(
+  phase: MatchPhase,
+  teamSource: BracketSource,
+  opponentSource: BracketSource
+): number {
+  if (phase === "POOL") return DEFAULT_ODDS;
 
-/** Cotes 1X2 (décimales) d'un match, normalisées pour notre usage. */
-export type OddsMatch = {
-  home: string;
-  away: string;
-  commenceTime: string; // ISO
-  oddsHome: number;
-  oddsDraw: number;
-  oddsAway: number;
-  bookmaker?: string;
-};
+  const isCross =
+    (teamSource === "WINNER_BRACKET" && opponentSource === "LOSER_BRACKET") ||
+    (teamSource === "LOSER_BRACKET" && opponentSource === "WINNER_BRACKET");
 
-// ── Types partiels du payload The Odds API ──
-type ApiOutcome = { name: string; price: number };
-type ApiMarket = { key: string; outcomes: ApiOutcome[] };
-type ApiBookmaker = { key: string; title: string; markets: ApiMarket[] };
-type ApiEvent = {
-  id: string;
-  commence_time: string;
-  home_team: string;
-  away_team: string;
-  bookmakers: ApiBookmaker[];
-};
-
-/** Extrait les cotes 1X2 d'un évènement (1er bookmaker proposant le h2h). */
-function toOddsMatch(ev: ApiEvent): OddsMatch | null {
-  for (const bk of ev.bookmakers) {
-    const h2h = bk.markets.find((m) => m.key === "h2h");
-    if (!h2h) continue;
-    const home = h2h.outcomes.find((o) => o.name === ev.home_team)?.price;
-    const away = h2h.outcomes.find((o) => o.name === ev.away_team)?.price;
-    const draw = h2h.outcomes.find((o) => o.name === "Draw")?.price;
-    if (home && away && draw) {
-      return {
-        home: ev.home_team,
-        away: ev.away_team,
-        commenceTime: ev.commence_time,
-        oddsHome: home,
-        oddsDraw: draw,
-        oddsAway: away,
-        bookmaker: bk.title,
-      };
-    }
+  if (isCross) {
+    return teamSource === "LOSER_BRACKET" ? CROSS_LOSER_ODDS : CROSS_WINNER_ODDS;
   }
-  return null;
+
+  return DEFAULT_ODDS;
 }
 
 /**
- * Récupère les cotes 1X2 en direct. Renvoie null si aucune clé n'est
- * configurée (l'appelant bascule alors sur les données d'exemple).
+ * Calcule la cote pour une équipe donnée dans un match.
+ * En poule : toujours x2.
+ * En bracket/finale : réduit de 0.2 par victoire accumulée dans le tournoi (plancher x1.2).
  */
-export async function fetchLiveOdds(): Promise<OddsMatch[] | null> {
-  const key = process.env.ODDS_API_KEY;
-  if (!key) return null;
-
-  const url =
-    `${BASE_URL}/sports/${ODDS_SPORT}/odds/?apiKey=${key}` +
-    `&regions=${ODDS_REGION}&markets=h2h&oddsFormat=decimal`;
-
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`the-odds-api ${res.status}: ${res.statusText} ${body}`.trim());
-  }
-  const events = (await res.json()) as ApiEvent[];
-  return events
-    .map(toOddsMatch)
-    .filter((m): m is OddsMatch => m !== null)
-    .sort((a, b) => +new Date(a.commenceTime) - +new Date(b.commenceTime));
+export function getOddsForTeam(
+  phase: MatchPhase,
+  teamSource: BracketSource,
+  opponentSource: BracketSource,
+  teamWins = 0
+): number {
+  const base = getBaseOdds(phase, teamSource, opponentSource);
+  if (phase === "POOL") return base;
+  const raw = base - teamWins * WINS_PENALTY;
+  return Math.max(ODDS_FLOOR, Math.round(raw * 10) / 10);
 }
 
 /**
- * Points pour un BON RÉSULTAT selon la proba implicite de l'issue choisie.
- * Courbe douce bornée ~1–6 : plus l'issue est improbable, plus ça rapporte.
- *   points = 1 + 5 × (1 − proba), arrondi.
- * Le score exact et la différence de buts s'ajouteraient par-dessus (hors proto).
+ * Cote pour un pari sur l'égalité (poules uniquement).
  */
-export function resultPoints(probPct: number): number {
-  const p = Math.min(1, Math.max(0, probPct / 100));
-  return Math.round(1 + 5 * (1 - p));
+export function getOddsForDraw(): number {
+  return DEFAULT_ODDS;
 }
 
-/** Cotes 1X2 décimales d'un match (telles que stockées sur `Match`). */
-export type Odds1x2 = { home: number; draw: number; away: number };
+export function calculatePayout(
+  amountWizz: number,
+  oddsApplied: number,
+  jokerUsed: boolean
+): number {
+  return Math.round(amountWizz * oddsApplied * (jokerUsed ? JOKER_MULTIPLIER : 1));
+}
 
-/** Cotes telles que lues en base : chaque champ peut être absent/null. */
-export type OddsInput = {
-  home?: number | null;
-  draw?: number | null;
-  away?: number | null;
-};
-
-/**
- * Points « bon résultat » (R) pour une issue, déduits des cotes 1X2.
- * `outcome` : 1 = victoire domicile, 0 = nul, -1 = victoire extérieur.
- * Renvoie `null` si les cotes sont absentes/invalides → l'appelant retombe sur
- * le barème historique.
- */
-export function outcomeResultPoints(
-  odds: OddsInput | null | undefined,
-  outcome: -1 | 0 | 1
-): number | null {
-  const home = odds?.home;
-  const draw = odds?.draw;
-  const away = odds?.away;
-  if (!home || !draw || !away || home <= 1 || draw <= 1 || away <= 1) return null;
-  const rHome = 1 / home;
-  const rDraw = 1 / draw;
-  const rAway = 1 / away;
-  const total = rHome + rDraw + rAway;
-  const p =
-    outcome === 1 ? rHome / total : outcome === 0 ? rDraw / total : rAway / total;
-  return resultPoints(p * 100);
+export function calculateNetGain(
+  amountWizz: number,
+  oddsApplied: number,
+  jokerUsed: boolean
+): number {
+  return calculatePayout(amountWizz, oddsApplied, jokerUsed) - amountWizz;
 }

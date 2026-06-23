@@ -1,9 +1,7 @@
 import Link from "next/link";
-import Image from "next/image";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { CredentialsForm, GoogleSignInButton } from "@/components/auth-buttons";
-import { InAppBrowserNotice } from "@/components/in-app-browser-notice";
 
 /** Garde-fou : n'autorise que des chemins internes (anti open-redirect). */
 function safeNext(next?: string): string {
@@ -26,19 +24,14 @@ export default async function LoginPage({
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4 py-8">
       {/* ── Animated background ────────────────────── */}
       <div className="pointer-events-none absolute inset-0">
-        {/* Base dark */}
         <div className="absolute inset-0 bg-[var(--color-bg)]" />
-
-        {/* Pitch gradient orb – top right */}
         <div
           className="absolute -right-32 -top-32 h-[500px] w-[500px] rounded-full opacity-[0.07] blur-[120px]"
           style={{
             background:
-              "radial-gradient(circle, var(--color-pitch) 0%, transparent 70%)",
+              "radial-gradient(circle, var(--color-accent) 0%, transparent 70%)",
           }}
         />
-
-        {/* Gold gradient orb – bottom left */}
         <div
           className="absolute -bottom-32 -left-32 h-[400px] w-[400px] rounded-full opacity-[0.05] blur-[100px]"
           style={{
@@ -46,8 +39,6 @@ export default async function LoginPage({
               "radial-gradient(circle, var(--color-gold) 0%, transparent 70%)",
           }}
         />
-
-        {/* Subtle grid pattern */}
         <div
           className="absolute inset-0 opacity-[0.015]"
           style={{
@@ -60,9 +51,7 @@ export default async function LoginPage({
 
       {/* ── Card ───────────────────────────────────── */}
       <div className="animate-stagger stagger-1 relative z-10 flex w-full max-w-md flex-col">
-        {/* Glass card */}
         <div className="glass-strong rounded-3xl p-8 shadow-2xl shadow-black/40">
-          {/* Back link */}
           <Link
             href="/"
             className="mb-6 inline-flex items-center gap-1.5 text-sm text-[var(--color-muted)] transition-colors duration-200 hover:text-[var(--color-cream)]"
@@ -83,30 +72,14 @@ export default async function LoginPage({
             Retour
           </Link>
 
-          {/* Header */}
           <div className="mb-8">
-            {/* Logo */}
-            <div className="mb-5">
-              <Image
-                src="/logo.png"
-                alt="DaronsFC"
-                width={80}
-                height={80}
-                priority
-                className="rounded-2xl shadow-lg shadow-[var(--color-pitch)]/20 ring-1 ring-white/10"
-              />
-            </div>
-
             <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--color-cream)]">
               Connexion
             </h1>
             <p className="mt-1.5 text-sm text-[var(--color-muted)]">
-              Rejoins ta bande de darons et fais tes pronos.
+              Rejoins le tournoi et fais tes pronostics.
             </p>
           </div>
-
-          {/* Avertissement navigateur intégré (Messenger, Instagram…) */}
-          <InAppBrowserNotice />
 
           {/* Google sign-in */}
           <GoogleSignInButton className="w-full" callbackUrl={dest} />
@@ -128,7 +101,7 @@ export default async function LoginPage({
             Pas encore de compte ?{" "}
             <Link
               href="/register"
-              className="font-medium text-[var(--color-pitch-bright)] transition-colors duration-200 hover:text-[var(--color-pitch)] hover:underline"
+              className="font-medium text-[var(--color-accent-bright)] transition-colors duration-200 hover:text-[var(--color-accent)] hover:underline"
             >
               Inscris-toi
             </Link>

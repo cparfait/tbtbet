@@ -1,0 +1,19 @@
+# TBT Bet — Base de données locale pour développement
+# Usage : docker compose -f docker-compose.local.yml up -d
+
+services:
+  tbt_db:
+    image: postgres:16-alpine
+    container_name: tbt_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tbtbet
+      POSTGRES_PASSWORD: tbtbet
+      POSTGRES_DB: tbtbet
+    ports:
+      - "5434:5432"
+    volumes:
+      - tbt_pgdata:/var/lib/postgresql/data
+
+volumes:
+  tbt_pgdata:

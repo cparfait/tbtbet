@@ -1,10 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, type ChangeEvent } from "react";
-import { Send, SmilePlus, Pin, PinOff, Eye, Plus } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { PageHeader } from "@/components/page-header";
-import { GroupSwitcher } from "@/components/group-switcher";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Send, SmilePlus, Pin, PinOff, Trash2 } from "lucide-react";
 
 const REACTION_EMOJIS = ["👍", "😂", "🔥", "😮", "⚽", "💀"];
 
@@ -16,178 +13,56 @@ type ChatMsg = {
   user: string;
   text: string;
   pinned: boolean;
-  isSystem?: boolean; // récap auto / annonce admin → rendu en bandeau centré
-  systemKind?: string | null; // "RECAP" | "ADMIN" — pilote le libellé du bandeau
-  timestamp: string; // ISO
+  isSystem?: boolean;
+  systemKind?: string | null;
+  timestamp: string;
   reactions: Reaction[];
 };
 
 type Props = {
-  currentUser: { id: string; name: string; isAdmin: boolean };
-  initial: ChatMsg[];
-  groups: { id: string; name: string; isMember?: boolean }[];
-  activeGroupId: string;
-  groupName: string;
-  /** true = admin consultant un groupe dont il n'est pas membre (pas d'écriture). */
-  readOnly?: boolean;
+  currentUserId: string;
+  isAdmin?: boolean;
 };
 
-function formatTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return "À l'instant";
-  if (mins < 60) return `il y a ${mins} min`;
-  const h = Math.floor(mins / 60);
-  if (h < 24) return `il y a ${h}h`;
-  return new Date(iso).toLocaleDateString("fr-FR", {
-    day: "numeric",
-    month: "short",
-  });
-}
-
-export function ChatView({
-  currentUser,
-  initial,
-  groups,
-  activeGroupId,
-  groupName,
-  readOnly = false,
-}: Props) {
-  const [messages, setMessages] = useState<ChatMsg[]>(initial);
+export function ChatView({ currentUserId, isAdmin = false }: Props) {
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [pickerFor, setPickerFor] = useState<string | null>(null);
-  const [nativePickerFor, setNativePickerFor] = useState<string | null>(null);
+  const [pickerMsgId, setPickerMsgId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const emojiInputRef = useRef<HTMLInputElement>(null);
-  const lastRef = useRef<string>(
-    initial.length > 0
-      ? (initial[initial.length - 1]?.timestamp ?? new Date(0).toISOString())
-      : new Date(0).toISOString()
-  );
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, []);
 
-  const poll = useCallback(async () => {
+  // Charger les messages
+  const fetchMessages = useCallback(async () => {
     try {
-      const res = await fetch(
-        `/api/messages?since=${encodeURIComponent(lastRef.current)}`
-      );
+      const res = await fetch("/api/messages");
       if (!res.ok) return;
-      const fresh: ChatMsg[] = await res.json();
-      if (!fresh.length) return;
-      setMessages((prev) => {
-        const ids = new Set(prev.map((m) => m.id));
-        const added = fresh.filter((m) => !ids.has(m.id));
-        if (!added.length) return prev;
-        lastRef.current = added[added.length - 1]?.timestamp ?? lastRef.current;
-        return [...prev, ...added];
-      });
-    } catch {}
+      const data = await res.json();
+      setMessages(data);
+    } catch {} finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    const t = setInterval(poll, 5000);
+    fetchMessages();
+    const t = setInterval(fetchMessages, 5_000);
     return () => clearInterval(t);
-  }, [poll]);
+  }, [fetchMessages]);
 
-  async function handleDelete(id: string) {
-    // Retrait optimiste, restauration si l'API échoue.
-    const prev = messages;
-    setMessages((m) => m.filter((msg) => msg.id !== id));
-    try {
-      const res = await fetch("/api/messages", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      if (!res.ok) setMessages(prev);
-    } catch {
-      setMessages(prev);
-    }
-  }
-
-  async function handlePin(id: string, pinned: boolean) {
-    setMessages((m) =>
-      m.map((msg) => (msg.id === id ? { ...msg, pinned } : msg))
-    );
-    try {
-      await fetch("/api/messages", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, pinned }),
-      });
-    } catch {}
-  }
-
-  async function handleReact(id: string, emoji: string) {
-    if (readOnly) return; // admin en consultation : pas d'écriture
-    setPickerFor(null);
-    // Toggle optimiste de la réaction.
-    setMessages((msgs) =>
-      msgs.map((m) => {
-        if (m.id !== id) return m;
-        const existing = m.reactions.find((r) => r.emoji === emoji);
-        let reactions: Reaction[];
-        if (existing?.mine) {
-          reactions = m.reactions
-            .map((r) =>
-              r.emoji === emoji ? { ...r, count: r.count - 1, mine: false } : r
-            )
-            .filter((r) => r.count > 0);
-        } else if (existing) {
-          reactions = m.reactions.map((r) =>
-            r.emoji === emoji ? { ...r, count: r.count + 1, mine: true } : r
-          );
-        } else {
-          reactions = [...m.reactions, { emoji, count: 1, mine: true }];
-        }
-        return { ...m, reactions };
-      })
-    );
-    try {
-      await fetch("/api/messages/react", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messageId: id, emoji }),
-      });
-    } catch {}
-  }
-
-  // Ouvre le sélecteur d'emojis natif de l'OS : on focus un champ caché, ce qui
-  // déclenche le clavier emoji sur mobile (et permet Win+. / Cmd+Ctrl+Espace sur desktop).
-  function openNativePicker(id: string) {
-    if (readOnly) return;
-    setNativePickerFor(id);
-    requestAnimationFrame(() => emojiInputRef.current?.focus());
-  }
-
-  // Récupère le dernier emoji saisi dans le champ caché et l'envoie comme réaction.
-  function handleNativeEmoji(e: ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value;
-    e.target.value = "";
-    const id = nativePickerFor;
-    setNativePickerFor(null);
-    emojiInputRef.current?.blur();
-    if (!id || !value) return;
-    let emoji = value;
-    try {
-      const parts = [
-        ...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(
-          value
-        ),
-      ];
-      emoji = parts[parts.length - 1]?.segment ?? value;
-    } catch {}
-    handleReact(id, emoji);
-  }
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages.length, scrollToBottom]);
 
   async function handleSend() {
-    if (readOnly) return;
     const text = input.trim();
     if (!text || sending) return;
+
     setSending(true);
     try {
       const res = await fetch("/api/messages", {
@@ -196,302 +71,210 @@ export function ChatView({
         body: JSON.stringify({ content: text }),
       });
       if (res.ok) {
-        const msg: ChatMsg = await res.json();
-        setMessages((prev) => {
-          const ids = new Set(prev.map((m) => m.id));
-          if (ids.has(msg.id)) return prev;
-          lastRef.current = msg.timestamp;
-          return [...prev, msg];
-        });
         setInput("");
+        inputRef.current?.focus();
+        await fetchMessages();
       }
-    } finally {
+    } catch {} finally {
       setSending(false);
     }
   }
 
+  async function handleReaction(msgId: string, emoji: string) {
+    try {
+      await fetch("/api/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId: msgId, emoji }),
+      });
+      setPickerMsgId(null);
+      await fetchMessages();
+    } catch {}
+  }
+
+  async function handleTogglePin(msgId: string, pinned: boolean) {
+    try {
+      await fetch("/api/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId: msgId, pinned: !pinned }),
+      });
+      await fetchMessages();
+    } catch {}
+  }
+
+  async function handleDelete(msgId: string) {
+    if (!confirm("Supprimer ce message ?")) return;
+    try {
+      await fetch("/api/messages", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: msgId }),
+      });
+      await fetchMessages();
+    } catch {}
+  }
+
+  const pinnedMsgs = messages.filter((m) => m.pinned);
+  const regularMsgs = messages.filter((m) => !m.pinned);
+
   return (
-    <div className="flex h-[calc(100dvh-7rem)] flex-col">
-      <PageHeader
-        title="Tchat"
-        subtitle={groupName}
-        action={<GroupSwitcher groups={groups} activeId={activeGroupId} />}
-      />
+    <div className="flex flex-col" style={{ height: "calc(100dvh - 180px)" }}>
+      {/* Pinned messages */}
+      {pinnedMsgs.length > 0 && (
+        <div className="mb-2 space-y-1">
+          {pinnedMsgs.map((msg) => (
+            <div
+              key={msg.id}
+              className="rounded-lg bg-[var(--color-accent)]/10 px-3 py-1.5 text-xs"
+            >
+              <span className="font-semibold text-[var(--color-accent)]">📌 {msg.user}</span>
+              <span className="ml-2 text-[var(--color-muted)]">{msg.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
-      {/* Message list */}
-      <div className="flex flex-1 flex-col gap-2 overflow-y-auto pr-1 scrollbar-thin">
-        {messages.length === 0 && (
-          <div className="flex flex-1 items-center justify-center">
-            <p className="text-center text-sm text-[var(--color-muted)]">
-              Aucun message pour l&apos;instant.
-              <br />
-              Sois le premier à tacler ! ⚽
-            </p>
-          </div>
-        )}
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto space-y-2 pb-2">
+        {loading ? (
+          <p className="text-center text-sm text-[var(--color-muted)]">Chargement...</p>
+        ) : regularMsgs.length === 0 ? (
+          <p className="text-center text-sm text-[var(--color-muted)]">
+            Aucun message. Lance la discussion !
+          </p>
+        ) : (
+          regularMsgs.map((msg) => {
+            const isMine = msg.userId === currentUserId;
 
-        {messages.map((msg, i) => {
-          // Récap auto / annonce admin (bot système) → bandeau centré.
-          if (msg.isSystem) {
-            const isAnnounce = msg.systemKind === "ADMIN";
+            if (msg.isSystem) {
+              return (
+                <div key={msg.id} className="text-center py-2">
+                  <span className="inline-block rounded-full bg-[var(--color-surface-2)] px-3 py-1 text-[10px] text-[var(--color-muted)]">
+                    {msg.systemKind === "RECAP" ? "📊 " : ""}{msg.text}
+                  </span>
+                </div>
+              );
+            }
+
             return (
-              <div key={msg.id} className="my-1 flex justify-center">
-                <Card
-                  className={`glass max-w-[92%] px-4 py-3 ${
-                    isAnnounce
-                      ? "border-[var(--color-pitch-bright)]/30 bg-[var(--color-pitch)]/[0.06]"
-                      : "border-[var(--color-gold)]/25 bg-[var(--color-gold)]/[0.04]"
-                  }`}
-                >
-                  <div className="mb-1.5 flex items-center justify-center gap-1.5">
-                    <span className="text-sm">{isAnnounce ? "📢" : "⚽"}</span>
-                    <span
-                      className={`text-[10px] font-bold uppercase tracking-widest ${
-                        isAnnounce
-                          ? "text-[var(--color-pitch-bright)]"
-                          : "text-[var(--color-gold)]"
-                      }`}
-                    >
-                      {isAnnounce ? "Annonce DaronsFC" : "Récap du match"}
-                    </span>
+              <div
+                key={msg.id}
+                className={`group flex ${isMine ? "justify-end" : "justify-start"}`}
+              >
+                <div className={`max-w-[80%] ${isMine ? "order-1" : ""}`}>
+                  {!isMine && (
+                    <p className="mb-0.5 text-[10px] font-semibold text-[var(--color-accent)]">
+                      {msg.user}
+                    </p>
+                  )}
+                  <div
+                    className={`rounded-2xl px-3 py-2 text-sm ${
+                      isMine
+                        ? "bg-[var(--color-accent)]/15 text-[var(--color-cream)]"
+                        : "bg-[var(--color-surface-2)] text-[var(--color-cream)]"
+                    }`}
+                  >
+                    <p>{msg.text}</p>
+                    <p className="mt-0.5 text-right text-[9px] opacity-50">
+                      {new Date(msg.timestamp).toLocaleTimeString("fr-FR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
                   </div>
-                  <p className="whitespace-pre-line text-center text-sm leading-relaxed text-[var(--color-cream)]">
-                    {msg.text}
-                  </p>
+
+                  {/* Reactions */}
                   {msg.reactions.length > 0 && (
-                    <div className="mt-2 flex flex-wrap justify-center gap-1">
+                    <div className="mt-1 flex flex-wrap gap-1">
                       {msg.reactions.map((r) => (
                         <button
                           key={r.emoji}
-                          type="button"
-                          onClick={() => handleReact(msg.id, r.emoji)}
-                          className={`flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs transition-colors ${
+                          onClick={() => handleReaction(msg.id, r.emoji)}
+                          className={`rounded-full px-2 py-0.5 text-xs ${
                             r.mine
-                              ? "bg-[var(--color-pitch)]/20 text-[var(--color-pitch-bright)]"
+                              ? "bg-[var(--color-accent)]/20 text-[var(--color-accent)]"
                               : "bg-[var(--color-surface-2)] text-[var(--color-muted)]"
                           }`}
                         >
-                          <span>{r.emoji}</span>
-                          <span className="font-[family-name:var(--font-mono)]">{r.count}</span>
+                          {r.emoji} {r.count}
                         </button>
                       ))}
                     </div>
                   )}
-                  <div className="mt-2 flex items-center justify-center gap-3">
+
+                  {/* Actions (hover) */}
+                  <div className="mt-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      type="button"
-                      onClick={() => setPickerFor(pickerFor === msg.id ? null : msg.id)}
-                      className="text-[10px] text-[var(--color-muted)] hover:text-[var(--color-cream)]"
+                      onClick={() => setPickerMsgId(pickerMsgId === msg.id ? null : msg.id)}
+                      className="rounded p-0.5 text-[var(--color-muted)] hover:text-[var(--color-cream)]"
                     >
-                      Réagir
+                      <SmilePlus className="size-3.5" />
                     </button>
-                    {currentUser.isAdmin && (
+                    {isAdmin && (
                       <button
-                        type="button"
-                        onClick={() => handleDelete(msg.id)}
-                        className="text-[10px] text-[var(--color-muted)] hover:text-red-400"
+                        onClick={() => handleTogglePin(msg.id, msg.pinned)}
+                        className="rounded p-0.5 text-[var(--color-muted)] hover:text-[var(--color-cream)]"
                       >
-                        Supprimer
+                        {msg.pinned ? (
+                          <PinOff className="size-3.5" />
+                        ) : (
+                          <Pin className="size-3.5" />
+                        )}
+                      </button>
+                    )}
+                    {(isAdmin || msg.userId === currentUserId) && (
+                      <button
+                        onClick={() => handleDelete(msg.id)}
+                        className="rounded p-0.5 text-[var(--color-muted)] hover:text-red-400"
+                      >
+                        <Trash2 className="size-3.5" />
                       </button>
                     )}
                   </div>
-                  {pickerFor === msg.id && (
-                    <div className="mt-2 flex flex-wrap justify-center gap-1 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] p-1.5">
-                      {REACTION_EMOJIS.map((e) => (
+
+                  {/* Emoji picker */}
+                  {pickerMsgId === msg.id && (
+                    <div className="mt-1 flex gap-1 rounded-lg bg-[var(--color-surface-2)] p-1">
+                      {REACTION_EMOJIS.map((emoji) => (
                         <button
-                          key={e}
-                          type="button"
-                          onClick={() => handleReact(msg.id, e)}
-                          className="flex size-7 items-center justify-center rounded-lg text-base transition-transform hover:scale-125"
+                          key={emoji}
+                          onClick={() => handleReaction(msg.id, emoji)}
+                          className="rounded p-1 text-sm hover:bg-[var(--color-surface-1)]"
                         >
-                          {e}
+                          {emoji}
                         </button>
                       ))}
-                      <button
-                        type="button"
-                        onClick={() => openNativePicker(msg.id)}
-                        title="Autre emoji…"
-                        className="flex size-7 items-center justify-center rounded-lg text-[var(--color-muted)] hover:text-[var(--color-cream)] hover:scale-125 transition-transform"
-                      >
-                        <Plus className="size-4" />
-                      </button>
                     </div>
                   )}
-                </Card>
+                </div>
               </div>
             );
-          }
-
-          const isOwn = msg.userId === currentUser.id;
-
-          const actions = (
-            <div className="flex shrink-0 flex-col items-center gap-1 self-center opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
-              <button
-                type="button"
-                onClick={() => setPickerFor(pickerFor === msg.id ? null : msg.id)}
-                title="Réagir"
-                className="flex size-7 items-center justify-center rounded-lg text-[var(--color-muted)] hover:text-[var(--color-cream)]"
-              >
-                <SmilePlus className="size-3.5" />
-              </button>
-              {currentUser.isAdmin && (
-                <button
-                  type="button"
-                  onClick={() => handlePin(msg.id, !msg.pinned)}
-                  title={msg.pinned ? "Désépingler" : "Épingler"}
-                  className="flex size-7 items-center justify-center rounded-lg text-[var(--color-muted)] hover:text-[var(--color-gold)]"
-                >
-                  {msg.pinned ? (
-                    <PinOff className="size-3.5" />
-                  ) : (
-                    <Pin className="size-3.5" />
-                  )}
-                </button>
-              )}
-            </div>
-          );
-
-          return (
-            <div
-              key={msg.id}
-              className={`group flex items-start gap-1.5 ${isOwn ? "justify-end" : "justify-start"}`}
-            >
-              {isOwn && actions}
-
-              <Card
-                className={`relative min-w-0 max-w-[85%] overflow-visible p-3 transition-all duration-200 ${
-                  msg.pinned
-                    ? "border-[var(--color-gold)]/40 bg-[var(--color-gold)]/5"
-                    : isOwn
-                      ? "border-[var(--color-pitch)]/20 bg-[var(--color-pitch)]/8"
-                      : i % 2 === 0
-                        ? "bg-[var(--color-surface)]"
-                        : "bg-[var(--color-surface-2)]"
-                }`}
-              >
-                {msg.pinned && (
-                  <div className="mb-2 flex items-center gap-1.5">
-                    <Pin className="size-3 text-[var(--color-gold)]" />
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-gold)]">
-                      Épinglé
-                    </span>
-                  </div>
-                )}
-
-                <div className="mb-1 flex items-baseline gap-2">
-                  <span className="text-xs font-bold text-[var(--color-pitch-bright)]">
-                    {isOwn ? "Moi" : msg.user}
-                  </span>
-                  <span className="text-[10px] text-[var(--color-muted)]">
-                    {formatTime(msg.timestamp)}
-                  </span>
-                </div>
-
-                <p className="whitespace-pre-line break-words text-sm leading-relaxed">
-                  {msg.text}
-                </p>
-
-                {/* Réactions */}
-                {msg.reactions.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {msg.reactions.map((r) => (
-                      <button
-                        key={r.emoji}
-                        type="button"
-                        onClick={() => handleReact(msg.id, r.emoji)}
-                        className={`flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs transition-colors ${
-                          r.mine
-                            ? "bg-[var(--color-pitch)]/20 text-[var(--color-pitch-bright)]"
-                            : "bg-[var(--color-surface-2)] text-[var(--color-muted)]"
-                        }`}
-                      >
-                        <span>{r.emoji}</span>
-                        <span className="font-[family-name:var(--font-mono)]">
-                          {r.count}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Sélecteur d'emoji */}
-                {pickerFor === msg.id && (
-                  <div className="mt-2 flex flex-wrap gap-1 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] p-1.5">
-                    {REACTION_EMOJIS.map((e) => (
-                      <button
-                        key={e}
-                        type="button"
-                        onClick={() => handleReact(msg.id, e)}
-                        className="flex size-7 items-center justify-center rounded-lg text-base transition-transform hover:scale-125"
-                      >
-                        {e}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => openNativePicker(msg.id)}
-                      title="Autre emoji…"
-                      className="flex size-7 items-center justify-center rounded-lg text-[var(--color-muted)] hover:text-[var(--color-cream)] hover:scale-125 transition-transform"
-                    >
-                      <Plus className="size-4" />
-                    </button>
-                  </div>
-                )}
-              </Card>
-
-              {!isOwn && actions}
-            </div>
-          );
-        })}
+          })
+        )}
         <div ref={bottomRef} />
       </div>
 
-      {/* Champ invisible qui sert uniquement à ouvrir le sélecteur d'emojis natif de l'OS. */}
-      <input
-        ref={emojiInputRef}
-        type="text"
-        inputMode="text"
-        aria-hidden="true"
-        tabIndex={-1}
-        autoComplete="off"
-        onChange={handleNativeEmoji}
-        className="pointer-events-none fixed left-0 top-0 size-px border-0 bg-transparent p-0 opacity-0"
-      />
-
-      {/* Input — ou bannière lecture seule pour un admin non-membre */}
-      {readOnly ? (
-        <div className="glass mt-3 flex items-center justify-center gap-2 rounded-2xl border border-[var(--color-border-subtle)] px-3 py-2.5 text-xs text-[var(--color-muted)]">
-          <Eye className="size-3.5 shrink-0 text-[var(--color-pitch-bright)]" />
-          <span>
-            Lecture seule — tu consultes ce groupe en tant qu&apos;admin (non membre).
-          </span>
-        </div>
-      ) : (
-        <div className="glass mt-3 flex items-center gap-2 rounded-2xl border border-[var(--color-border-subtle)] px-3 py-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            placeholder="Écris ton message..."
-            className="h-9 flex-1 bg-transparent text-sm text-[var(--color-cream)] placeholder:text-[var(--color-muted)] focus:outline-none"
-          />
-
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!input.trim() || sending}
-            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-pitch)] text-white transition-all duration-200 hover:bg-[var(--color-pitch-bright)] disabled:opacity-30 disabled:hover:bg-[var(--color-pitch)]"
-          >
-            <Send className="size-4" />
-          </button>
-        </div>
-      )}
+      {/* Input */}
+      <div className="flex items-center gap-2 pt-2">
+        <input
+          ref={inputRef}
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          placeholder="Écris un message..."
+          className="flex-1 rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-4 py-2.5 text-sm outline-none focus:border-[var(--color-accent)]"
+          maxLength={500}
+        />
+        <button
+          onClick={handleSend}
+          disabled={!input.trim() || sending}
+          className="flex size-10 items-center justify-center rounded-full bg-[var(--color-accent)] text-black disabled:opacity-40"
+        >
+          <Send className="size-4" />
+        </button>
+      </div>
     </div>
   );
 }

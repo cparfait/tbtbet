@@ -49,10 +49,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   events: {
     async signIn() {
-      // Sync silencieux à chaque connexion (debounce 2 min, ne bloque pas le login)
-      import("./football-data")
-        .then(({ maybeSyncMatches }) => maybeSyncMatches())
-        .catch(() => {});
+      // TBT Bet : pas de sync API externe
     },
   },
   providers: [

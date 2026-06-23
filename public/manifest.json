@@ -1,14 +1,14 @@
 {
-  "name": "DaronsFC — Pronos entre potes",
-  "short_name": "DaronsFC",
-  "description": "Pronostics de la Coupe du Monde entre amis.",
+  "name": "TBT Bet — Tournoi Babyfoot Withings",
+  "short_name": "TBT Bet",
+  "description": "Pronostics du tournoi de babyfoot interne Withings. Parie, grimpe au classement, deviens le champion des pronostiqueurs.",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0A0A0A",
   "theme_color": "#0A0A0A",
-  "categories": ["sports", "social", "games"],
+  "categories": ["sports", "games"],
   "icons": [
     {
       "src": "/icons/icon-192.png",

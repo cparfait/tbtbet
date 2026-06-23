@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { sendPushToUsers } from "@/lib/push";
-import { getActiveGroup, getGroupMemberIds } from "@/lib/groups";
 
 /** Agrège les réactions d'un message en { emoji, count, mine }. */
 function aggregateReactions(
@@ -24,15 +22,12 @@ export async function GET(req: Request) {
     const session = await auth();
     const meId = session?.user?.id;
     if (!meId) return NextResponse.json([]);
-    const active = await getActiveGroup(meId);
-    if (!active) return NextResponse.json([]);
+
     const { searchParams } = new URL(req.url);
     const since = searchParams.get("since");
-    // Avec `since` (polling) : les nouveaux messages, en ordre chronologique.
-    // Sans `since` : les 100 DERNIERS (desc + reverse), pas les 100 premiers.
+
     let messages = await prisma.message.findMany({
       where: {
-        groupId: active.id,
         ...(since ? { createdAt: { gt: new Date(since) } } : {}),
       },
       include: {
@@ -42,12 +37,14 @@ export async function GET(req: Request) {
       orderBy: { createdAt: since ? "asc" : "desc" },
       take: 100,
     });
+
     if (!since) messages = messages.reverse();
+
     return NextResponse.json(
       messages.map((m) => ({
         id: m.id,
         userId: m.userId,
-        user: m.user.name ?? "Daron",
+        user: m.user.name ?? "Anonyme",
         text: m.content,
         pinned: m.pinned,
         isSystem: m.isSystem,
@@ -61,18 +58,52 @@ export async function GET(req: Request) {
   }
 }
 
-/** Épingle / désépingle un message (admin uniquement). */
+/** Réaction ou épinglage. */
 export async function PATCH(req: Request) {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") {
-    return NextResponse.json({ error: "Réservé aux admins" }, { status: 403 });
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Non connecté" }, { status: 401 });
   }
-  const { id, pinned } = await req.json().catch(() => ({}));
-  if (typeof id !== "string" || typeof pinned !== "boolean") {
-    return NextResponse.json({ error: "Requête invalide" }, { status: 400 });
+
+  const body = await req.json().catch(() => ({}));
+  const { messageId, emoji, pinned } = body;
+
+  if (typeof messageId !== "string") {
+    return NextResponse.json({ error: "messageId requis" }, { status: 400 });
   }
-  await prisma.message.update({ where: { id }, data: { pinned } });
-  return NextResponse.json({ ok: true });
+
+  // Épinglage (admin seulement)
+  if (typeof pinned === "boolean") {
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Réservé aux admins" }, { status: 403 });
+    }
+    await prisma.message.update({ where: { id: messageId }, data: { pinned } });
+    return NextResponse.json({ ok: true });
+  }
+
+  // Réaction (toggle)
+  if (typeof emoji === "string") {
+    const existing = await prisma.reaction.findUnique({
+      where: {
+        messageId_userId_emoji: {
+          messageId,
+          userId: session.user.id,
+          emoji,
+        },
+      },
+    });
+
+    if (existing) {
+      await prisma.reaction.delete({ where: { id: existing.id } });
+    } else {
+      await prisma.reaction.create({
+        data: { messageId, userId: session.user.id, emoji },
+      });
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  return NextResponse.json({ error: "Action invalide" }, { status: 400 });
 }
 
 /** Suppression d'un message — par son auteur ou par un admin. */
@@ -103,7 +134,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Non connecté" }, { status: 401 });
   }
   try {
-    // La session JWT ne reflète pas un bannissement prononcé après le login.
     const me = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { banned: true },
@@ -111,48 +141,25 @@ export async function POST(req: Request) {
     if (!me || me.banned) {
       return NextResponse.json({ error: "Compte suspendu." }, { status: 403 });
     }
-    const active = await getActiveGroup(session.user.id);
-    if (!active) {
-      return NextResponse.json({ error: "Aucun groupe actif" }, { status: 400 });
-    }
-    if (active.readOnly) {
-      return NextResponse.json(
-        { error: "Lecture seule : tu n'es pas membre de ce groupe." },
-        { status: 403 }
-      );
-    }
+
     const { content } = await req.json();
     const text = (content ?? "").trim();
     if (!text) {
       return NextResponse.json({ error: "Message vide" }, { status: 400 });
     }
+
     const msg = await prisma.message.create({
       data: {
         userId: session.user.id,
-        groupId: active.id,
         content: text.slice(0, 500),
       },
       include: { user: { select: { id: true, name: true } } },
     });
 
-    // Notification push aux membres du groupe (sauf l'auteur), fire-and-forget.
-    getGroupMemberIds(active.id)
-      .then((ids) =>
-        sendPushToUsers(
-          ids.filter((id) => id !== session.user!.id),
-          {
-            title: `${msg.user.name ?? "Daron"} · ${active.name}`,
-            body: text.slice(0, 120),
-            url: "/chat",
-          }
-        )
-      )
-      .catch(() => {});
-
     return NextResponse.json({
       id: msg.id,
       userId: msg.userId,
-      user: msg.user.name ?? "Daron",
+      user: msg.user.name ?? "Anonyme",
       text: msg.content,
       pinned: msg.pinned,
       isSystem: msg.isSystem,

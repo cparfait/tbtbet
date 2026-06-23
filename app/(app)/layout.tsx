@@ -1,13 +1,10 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { maybeSyncMatches } from "@/lib/football-data";
 import { maybeInit } from "@/lib/init";
-import { getFranceMatchToday } from "@/lib/data/queries";
 import { BottomNav } from "@/components/bottom-nav";
-import { PushAutoEnroll } from "@/components/push-auto-enroll";
-import { PresenceHeartbeat } from "@/components/presence-heartbeat";
-import { FranceMatchBanner } from "@/components/france-match-banner";
-import { cn } from "@/lib/utils";
+import { AppHeader } from "@/components/app-header";
+import { WelcomeModal } from "@/components/welcome-modal";
+import { getUserById, getAllTeams } from "@/lib/data/queries";
 
 export default async function AppLayout({
   children,
@@ -18,33 +15,35 @@ export default async function AppLayout({
   if (!session?.user) redirect("/login");
 
   maybeInit().catch(() => {});
-  maybeSyncMatches().catch(() => {});
 
-  // Clé VAPID lue au runtime (NEXT_PUBLIC_* figé au build ne marche pas via
-  // Portainer) — passée en prop, comme sur la page profil.
-  const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
+  const [user, teams] = await Promise.all([
+    getUserById(session.user.id),
+    getAllTeams(),
+  ]);
 
-  // Thème tricolore les jours de match de l'équipe de France.
-  const franceMatch = await getFranceMatchToday().catch(() => null);
+  const showWelcome = user && !user.hasSeenWelcome;
 
   return (
-    <div
-      className={cn(
-        "mx-auto flex min-h-dvh max-w-md flex-col",
-        franceMatch && "theme-france"
-      )}
-    >
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col">
+      <AppHeader
+        user={{
+          name: user?.name ?? null,
+          email: user?.email ?? session.user.email ?? "",
+          avatarUrl: user?.avatarUrl ?? null,
+          image: user?.image ?? null,
+          role: user?.role ?? "USER",
+          wizzBalance: user?.wizzBalance ?? 0,
+        }}
+      />
       <main className="page-enter flex-1 px-4 pb-24 pt-4">
-        <PushAutoEnroll vapidKey={vapidKey} />
-        <PresenceHeartbeat />
-        {franceMatch && (
-          <div className="mb-4">
-            <FranceMatchBanner match={franceMatch} />
-          </div>
-        )}
         {children}
       </main>
       <BottomNav />
+      {showWelcome && (
+        <WelcomeModal
+          teams={teams.map((t) => ({ id: t.id, name: t.name, logoUrl: t.logoUrl }))}
+        />
+      )}
     </div>
   );
 }

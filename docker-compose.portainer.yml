@@ -1,77 +1,72 @@
 # ──────────────────────────────────────────────────────────────────────────────
-# DaronsFC — Portainer Stack
+# TBT Bet — Portainer Stack
 # ──────────────────────────────────────────────────────────────────────────────
-# Serveur : /home/apache/daronscup
-# Exposition : port 8895 → NPM → https://foot.cparfait.ovh
-#
 # Déploiement dans Portainer :
-#   1. Stacks → Add stack → nom : daronsfc
+#   1. Stacks → Add stack → nom : tbtbet
 #   2. Méthode : Web editor → coller ce contenu
-#   3. Onglet "Env" : remplir les variables
+#   3. Onglet "Env" : remplir les variables obligatoires
 #   4. Deploy the stack
 #
-# Image : ghcr.io/cparfait/daronscup:latest
+# Image : ghcr.io/cparfait/tbtbet:latest
 # → Mise à jour automatique via GitHub Actions sur chaque push sur `main`.
 # → Portainer webhook déclenche le pull + redémarrage.
 #
-# Pour rendre l'image publique (lecture sans token) :
-#   GitHub → Packages → daronscup → Package settings → Change visibility → Public
+# Webhook Portainer → GitHub Actions secret :
+#   Portainer → Stacks → tbtbet → Webhooks → copier l'URL
+#   GitHub → Settings → Secrets → PORTAINER_WEBHOOK → coller l'URL
+#
+# Pour rendre les images publiques (lecture sans token) :
+#   GitHub → Packages → tbtbet → Package settings → Change visibility → Public
 # Sinon Portainer doit s'authentifier :
 #   Portainer → Registries → Add registry → GitHub (ghcr.io)
 #
-# Variables à définir dans Portainer (onglet Env) :
-#   AUTH_SECRET          = openssl rand -base64 32
-#   AUTH_URL             = https://foot.cparfait.ovh   ← NextAuth v5 (obligatoire)
-#   NEXTAUTH_URL         = https://foot.cparfait.ovh   ← compat NextAuth v4
-#   AUTH_GOOGLE_ID       = (ton Google Client ID)
-#   AUTH_GOOGLE_SECRET   = (ton Google Client Secret)
-#   FOOTBALL_DATA_TOKEN  = (ton token football-data.org)
-#   ODDS_API_KEY         = (ta clé the-odds-api.com, sinon barème classique)
-#   ODDS_API_SPORT       = soccer_fifa_world_cup  ← clé sport The Odds API
-#   POSTGRES_PASSWORD    = (mot de passe sécurisé)
-#   ADMIN_EMAIL          = admin@daronsfc.fr  ← email du compte admin
-#   ADMIN_PASSWORD       = (mot de passe admin, créé au 1er démarrage)
+# Variables obligatoires (onglet Env de Portainer) :
+#   AUTH_SECRET       = openssl rand -base64 32
+#   AUTH_URL          = https://tbt.cparfait.ovh   ← URL publique
+#   ADMIN_EMAIL       = admin@example.com
+#   ADMIN_PASSWORD    = (mot de passe admin initial)
+#   POSTGRES_PASSWORD = (mot de passe sécurisé)
 # ──────────────────────────────────────────────────────────────────────────────
 
 services:
 
   db:
     image: postgres:16-alpine
-    container_name: daronsfc_db
+    container_name: tbtbet_db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-daronsfc}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-daronsfc_secret}
-      POSTGRES_DB: ${POSTGRES_DB:-daronsfc}
+      POSTGRES_USER: ${POSTGRES_USER:-tbtbet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tbtbet_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-tbtbet}
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
-      - daronsfc_net
+      - tbtbet_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-daronsfc}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tbtbet}"]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
 
   migrate:
-    image: ghcr.io/cparfait/daronscup:migrate
+    image: ghcr.io/cparfait/tbtbet:migrate
     pull_policy: always
-    container_name: daronsfc_migrate
+    container_name: tbtbet_migrate
     restart: "no"
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: "postgresql://${POSTGRES_USER:-daronsfc}:${POSTGRES_PASSWORD:-daronsfc_secret}@db:5432/${POSTGRES_DB:-daronsfc}?schema=public"
-      DIRECT_URL: "postgresql://${POSTGRES_USER:-daronsfc}:${POSTGRES_PASSWORD:-daronsfc_secret}@db:5432/${POSTGRES_DB:-daronsfc}?schema=public"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-tbtbet}:${POSTGRES_PASSWORD:-tbtbet_secret}@db:5432/${POSTGRES_DB:-tbtbet}?schema=public"
+      DIRECT_URL: "postgresql://${POSTGRES_USER:-tbtbet}:${POSTGRES_PASSWORD:-tbtbet_secret}@db:5432/${POSTGRES_DB:-tbtbet}?schema=public"
     networks:
-      - daronsfc_net
+      - tbtbet_net
 
   app:
-    image: ghcr.io/cparfait/daronscup:latest
+    image: ghcr.io/cparfait/tbtbet:latest
     pull_policy: always
-    container_name: daronsfc_app
+    container_name: tbtbet_app
     restart: unless-stopped
     depends_on:
       db:
@@ -79,45 +74,23 @@ services:
       migrate:
         condition: service_completed_successfully
     ports:
-      - "8895:3000"
+      - "${PORT:-8896}:3000"
     environment:
-      DATABASE_URL: "postgresql://${POSTGRES_USER:-daronsfc}:${POSTGRES_PASSWORD:-daronsfc_secret}@db:5432/${POSTGRES_DB:-daronsfc}?schema=public"
-      DIRECT_URL: "postgresql://${POSTGRES_USER:-daronsfc}:${POSTGRES_PASSWORD:-daronsfc_secret}@db:5432/${POSTGRES_DB:-daronsfc}?schema=public"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-tbtbet}:${POSTGRES_PASSWORD:-tbtbet_secret}@db:5432/${POSTGRES_DB:-tbtbet}?schema=public"
+      DIRECT_URL: "postgresql://${POSTGRES_USER:-tbtbet}:${POSTGRES_PASSWORD:-tbtbet_secret}@db:5432/${POSTGRES_DB:-tbtbet}?schema=public"
       AUTH_SECRET: "${AUTH_SECRET}"
-      AUTH_URL: "${AUTH_URL:-https://foot.cparfait.ovh}"
-      NEXTAUTH_URL: "${NEXTAUTH_URL:-https://foot.cparfait.ovh}"
-      AUTH_GOOGLE_ID: "${AUTH_GOOGLE_ID:-}"
-      AUTH_GOOGLE_SECRET: "${AUTH_GOOGLE_SECRET:-}"
-      FOOTBALL_DATA_TOKEN: "${FOOTBALL_DATA_TOKEN:-}"
-      FOOTBALL_DATA_COMPETITION: "${FOOTBALL_DATA_COMPETITION:-WC}"
-      SYNC_LIVE_SECONDS: "${SYNC_LIVE_SECONDS:-90}"
-      SYNC_IDLE_MINUTES: "${SYNC_IDLE_MINUTES:-30}"
-      ODDS_API_KEY: "${ODDS_API_KEY:-}"
-      ODDS_API_SPORT: "${ODDS_API_SPORT:-soccer_fifa_world_cup}"
-      ODDS_API_REGION: "${ODDS_API_REGION:-eu}"
-      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@daronsfc.fr}"
+      AUTH_URL: "${AUTH_URL:-https://tbt.cparfait.ovh}"
+      NEXTAUTH_URL: "${AUTH_URL:-https://tbt.cparfait.ovh}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@tbtbet.fr}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
-      NEXT_PUBLIC_VAPID_PUBLIC_KEY: "${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}"
-      VAPID_PRIVATE_KEY: "${VAPID_PRIVATE_KEY:-}"
-      VAPID_SUBJECT: "${VAPID_SUBJECT:-mailto:admin@daronsfc.fr}"
       NODE_ENV: production
-    healthcheck:
-      test:
-        - CMD
-        - node
-        - -e
-        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
     networks:
-      - daronsfc_net
+      - tbtbet_net
 
 networks:
-  daronsfc_net:
+  tbtbet_net:
     driver: bridge
 
 volumes:
   pgdata:
-    name: daronsfc_pgdata
+    name: tbtbet_pgdata

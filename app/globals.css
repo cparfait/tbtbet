@@ -1,18 +1,19 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────
-   DaronsFC — Design system (dark mode par défaut)
+   TBT Bet — Design system (dark mode par défaut)
+   Noir / Blanc / Jaune
    ───────────────────────────────────────────── */
 
 @theme {
   --color-bg: #0a0a0a;
   --color-bg-elevated: #111111;
-  --color-pitch: #16a34a;
-  --color-pitch-bright: #22c55e;
-  --color-pitch-glow: rgba(34, 197, 94, 0.15);
-  --color-gold: #f59e0b;
-  --color-gold-bright: #fbbf24;
-  --color-gold-glow: rgba(245, 158, 11, 0.15);
+  --color-accent: #eab308;
+  --color-accent-bright: #facc15;
+  --color-accent-glow: rgba(234, 179, 8, 0.15);
+  --color-gold: #eab308;
+  --color-gold-bright: #facc15;
+  --color-gold-glow: rgba(234, 179, 8, 0.15);
   --color-cream: #f8fafc;
   --color-surface: #141414;
   --color-surface-2: #1a1a1a;
@@ -127,7 +128,7 @@ body {
 }
 
 ::selection {
-  background-color: rgba(34, 197, 94, 0.3);
+  background-color: rgba(234, 179, 8, 0.3);
   color: white;
 }
 
@@ -199,15 +200,15 @@ body {
   background-clip: text;
 }
 
-.text-gradient-pitch {
-  background: linear-gradient(135deg, var(--color-pitch), var(--color-pitch-bright));
+.text-gradient-accent {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-bright));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-.glow-pitch {
-  box-shadow: 0 0 20px rgba(22, 163, 74, 0.2), 0 0 40px rgba(22, 163, 74, 0.1);
+.glow-accent {
+  box-shadow: 0 0 20px rgba(234, 179, 8, 0.2), 0 0 40px rgba(234, 179, 8, 0.1);
 }
 
 /* ── Thème « jour de match des Bleus » ──
@@ -288,7 +289,7 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid var(--color-pitch-bright);
+  outline: 2px solid var(--color-accent-bright);
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -350,7 +351,7 @@ select:focus-visible,
 .landing-dot {
   position: absolute;
   border-radius: 50%;
-  background: var(--color-pitch-bright);
+  background: var(--color-accent-bright);
   opacity: 0;
   animation: landing-dot-pulse 4s ease-in-out infinite;
 }

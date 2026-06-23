@@ -6,40 +6,25 @@ import { useEffect, useState, useCallback } from "react";
 import {
   Home,
   CalendarDays,
-  ListChecks,
   Trophy,
   MessageCircle,
-  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
-  { href: "/dashboard", label: "Hub", icon: Home },
+  { href: "/dashboard", label: "Accueil", icon: Home },
   { href: "/matches", label: "Matchs", icon: CalendarDays },
-  { href: "/results", label: "Résultats", icon: ListChecks },
   { href: "/leaderboard", label: "Classement", icon: Trophy },
-  { href: "/chat", label: "Tchat", icon: MessageCircle },
-  { href: "/profile", label: "Profil", icon: User },
+  { href: "/chat", label: "Chat", icon: MessageCircle },
 ] as const;
 
-/**
- * Clé localStorage du « dernier message vu », PAR groupe actif (cookie
- * daronsfc_group). Sans ça, lire le tchat d'un groupe masquerait les
- * non-lus des autres groupes.
- */
-function lastSeenKey(): string {
-  const groupId =
-    document.cookie.match(/(?:^|;\s*)daronsfc_group=([^;]+)/)?.[1] ?? "default";
-  return `daronsfc-chat-lastseen-${groupId}`;
-}
-
-/** Détecte les nouveaux messages du tchat du groupe actif (pastille). */
+/** Détecte les nouveaux messages du tchat (pastille). */
 function useChatUnread(pathname: string): boolean {
   const [unread, setUnread] = useState(false);
   const onChat = pathname.startsWith("/chat");
 
   const check = useCallback(async () => {
-    const key = lastSeenKey();
+    const key = "tbtbet-chat-lastseen";
     let since = localStorage.getItem(key);
     if (!since) {
       since = new Date().toISOString();
@@ -55,10 +40,8 @@ function useChatUnread(pathname: string): boolean {
 
   useEffect(() => {
     if (onChat) {
-      // Sur le tchat : tout est lu pour le groupe actif. On met le repère à
-      // jour en continu, pour couvrir aussi les messages reçus pendant qu'on lit.
       const mark = () =>
-        localStorage.setItem(lastSeenKey(), new Date().toISOString());
+        localStorage.setItem("tbtbet-chat-lastseen", new Date().toISOString());
       mark();
       setUnread(false);
       const t = setInterval(mark, 5_000);
@@ -91,25 +74,25 @@ export function BottomNav() {
                 className={cn(
                   "group relative flex flex-col items-center gap-0.5 py-1.5 text-[10px] font-medium transition-all duration-200",
                   active
-                    ? "text-[var(--color-pitch-bright)]"
+                    ? "text-[var(--color-accent-bright)]"
                     : "text-[var(--color-muted)] hover:text-[var(--color-cream)]"
                 )}
               >
                 {active && (
-                  <span className="absolute -top-1.5 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-[var(--color-pitch-bright)] transition-all duration-300" />
+                  <span className="absolute -top-1.5 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-[var(--color-accent-bright)] transition-all duration-300" />
                 )}
                 <span
                   className={cn(
                     "relative flex size-9 items-center justify-center rounded-xl transition-all duration-200",
                     active
-                      ? "bg-[var(--color-pitch)]/15 scale-110"
+                      ? "bg-[var(--color-accent)]/15 scale-110"
                       : "group-hover:bg-[var(--color-surface-2)] group-hover:scale-105"
                   )}
                 >
                   <Icon
                     className={cn(
                       "size-[18px] transition-all duration-200",
-                      active && "drop-shadow-[0_0_8px_var(--color-pitch-bright)]"
+                      active && "drop-shadow-[0_0_8px_var(--color-accent-bright)]"
                     )}
                     strokeWidth={active ? 2.5 : 1.8}
                   />

@@ -1,1369 +1,914 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import {
-  RefreshCw,
-  Ban,
-  ShieldCheck,
-  ShieldOff,
-  Undo2,
-  Check,
-  Loader2,
-  Trash2,
-  Users,
-  Copy,
-  ChevronDown,
-  MessageSquare,
-} from "lucide-react";
-import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import type {
-  AdminUser,
-  AdminMatchBrief,
-  AdminMatchResult,
-  AdminGroup,
-  AdminPredictionMap,
-} from "@/lib/data/admin";
+import { cn } from "@/lib/utils";
+import { Users, Swords, Trophy, Plus, Trash2, CheckCircle2, Calendar, RefreshCw, ImageIcon, Check, X, Upload } from "lucide-react";
 
-export function AdminConsole({
-  users,
-  matches,
-  allMatches,
-  groups,
-  predictions,
-  currentUserId,
-  championTeams,
-  championOverride,
-}: {
-  users: AdminUser[];
-  matches: AdminMatchResult[];
-  allMatches: AdminMatchBrief[];
-  groups: AdminGroup[];
-  predictions: AdminPredictionMap;
-  currentUserId: string;
-  championTeams: { team: string; flag: string }[];
-  championOverride: { team: string; flag: string } | null;
-}) {
-  return (
-    <div className="grid gap-4">
-      <PresencePanel />
-      <SyncPanel />
-      <InvitePanel />
-      <GroupsPanel groups={groups} />
-      <ImportPredictionPanel users={users} matches={allMatches} predictions={predictions} />
-      <ManualScorePanel matches={matches} />
-      <OddsPanel matches={matches} />
-      <BroadcastPanel />
-      <RescorePanel />
-      <ChampionPanel teams={championTeams} current={championOverride} />
-      <UsersPanel users={users} currentUserId={currentUserId} />
-      <CloseTournamentPanel />
-      <ResetPanel />
-    </div>
-  );
+// ── Types ──
+
+interface AdminUser {
+  id: string;
+  name: string | null;
+  email: string;
+  role: string;
+  wizzBalance: number;
+  jokersLeft: number;
+  banned: boolean;
+  createdAt: Date;
 }
 
-/* ─── Joueurs en ligne (présence, auto-actualisé) ─── */
-function PresencePanel() {
-  const [data, setData] = useState<{ count: number; users: string[] } | null>(null);
-  const [loading, setLoading] = useState(false);
+interface Team {
+  id: string;
+  name: string;
+  player1: string | null;
+  player2: string | null;
+  logoUrl: string | null;
+  poolId: string | null;
+  pool?: { id: string; name: string } | null;
+  eliminated: boolean;
+}
 
-  const refresh = async () => {
-    setLoading(true);
+interface Pool {
+  id: string;
+  name: string;
+  color: string;
+  teams: Team[];
+}
+
+interface Match {
+  id: string;
+  label: string;
+  phase: string;
+  teamA: Team;
+  teamB: Team;
+  teamASource: string;
+  teamBSource: string;
+  status: string;
+  result: string | null;
+  scoreA: number | null;
+  scoreB: number | null;
+  scheduledAt: Date | string | null;
+  finalSeriesId: string | null;
+}
+
+interface AdminConsoleProps {
+  users: AdminUser[];
+  teams: Team[];
+  pools: Pool[];
+  matches: Match[];
+  currentUserId: string;
+}
+
+type Tab = "teams" | "pools" | "matches" | "results" | "users";
+
+const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
+  { key: "teams", label: "Équipes", icon: Swords },
+  { key: "pools", label: "Poules", icon: Trophy },
+  { key: "matches", label: "Matchs", icon: Calendar },
+  { key: "results", label: "Résultats", icon: CheckCircle2 },
+  { key: "users", label: "Joueurs", icon: Users },
+];
+
+const PHASES = [
+  { value: "POOL", label: "Phase de poules" },
+  { value: "WINNER_BRACKET", label: "Winner Bracket" },
+  { value: "LOSER_BRACKET", label: "Loser Bracket" },
+  { value: "FINAL_SERIES", label: "Finale (BO3)" },
+];
+
+const SOURCES = [
+  { value: "POOL", label: "Poule" },
+  { value: "WINNER_BRACKET", label: "Winner" },
+  { value: "LOSER_BRACKET", label: "Loser" },
+];
+
+export function AdminConsole({ users, teams, pools, matches, currentUserId }: AdminConsoleProps) {
+  const router = useRouter();
+  const [tab, setTab] = useState<Tab>("teams");
+  const [message, setMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadTarget, setUploadTarget] = useState<"create" | string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  // Teams form
+  const [teamName, setTeamName] = useState("");
+  const [teamPlayer1, setTeamPlayer1] = useState("");
+  const [teamPlayer2, setTeamPlayer2] = useState("");
+  const [teamLogoUrl, setTeamLogoUrl] = useState("");
+  // Team logo edit
+  const [editLogoTeamId, setEditLogoTeamId] = useState<string | null>(null);
+  const [editLogoUrl, setEditLogoUrl] = useState("");
+
+  // Pool form
+  const [poolName, setPoolName] = useState("");
+  const [poolColor, setPoolColor] = useState("#F5C400");
+  // Couleurs en cours d'édition par poule (poolId → couleur)
+  const [poolColorEdits, setPoolColorEdits] = useState<Record<string, string>>({});
+
+  // Match form
+  const [matchLabel, setMatchLabel] = useState("");
+  const [matchPhase, setMatchPhase] = useState("POOL");
+  const [matchTeamAId, setMatchTeamAId] = useState("");
+  const [matchTeamASource, setMatchTeamASource] = useState("POOL");
+  const [matchTeamBId, setMatchTeamBId] = useState("");
+  const [matchTeamBSource, setMatchTeamBSource] = useState("POOL");
+  const [matchScheduledAt, setMatchScheduledAt] = useState("");
+  // Inline date editing for pool matches
+  const [editDateMatchId, setEditDateMatchId] = useState<string | null>(null);
+  const [editDateValue, setEditDateValue] = useState("");
+
+  // Result form
+  const [resultMatchId, setResultMatchId] = useState("");
+  const [resultScoreA, setResultScoreA] = useState(0);
+  const [resultScoreB, setResultScoreB] = useState(0);
+  const [resultWinner, setResultWinner] = useState<"TEAM_A" | "TEAM_B" | "DRAW">("TEAM_A");
+
+  // Create user form
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserRole, setNewUserRole] = useState<"USER" | "ADMIN">("USER");
+
+  async function apiCall(url: string, method: string, body?: Record<string, unknown>) {
+    const res = await fetch(url, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Erreur");
+    }
+    return res.json();
+  }
+
+  function ok(msg: string) { setMessage(msg); router.refresh(); }
+  function err(e: unknown) { setMessage(e instanceof Error ? e.message : "Erreur"); }
+
+  // ── Teams ──
+  async function handleCreateTeam() {
+    if (!teamName.trim()) return;
     try {
-      const res = await fetch("/api/admin/presence");
-      if (res.ok) setData(await res.json());
-    } catch {
-      /* best-effort */
+      await apiCall("/api/admin/teams", "POST", {
+        name: teamName,
+        player1: teamPlayer1 || null,
+        player2: teamPlayer2 || null,
+        logoUrl: teamLogoUrl || null,
+      });
+      setTeamName(""); setTeamPlayer1(""); setTeamPlayer2(""); setTeamLogoUrl("");
+      ok("Équipe créée !");
+    } catch (e) { err(e); }
+  }
+
+  async function handleDeleteTeam(id: string) {
+    try { await apiCall(`/api/admin/teams?id=${id}`, "DELETE"); ok("Équipe supprimée."); }
+    catch (e) { err(e); }
+  }
+
+  async function handleSaveLogo(teamId: string, logoUrl: string) {
+    try {
+      await apiCall("/api/admin/teams", "PATCH", { id: teamId, logoUrl: logoUrl || null });
+      setEditLogoTeamId(null);
+      ok("Logo mis à jour.");
+    } catch (e) { err(e); }
+  }
+
+  // ── Pools ──
+  async function handleCreatePool() {
+    if (!poolName.trim()) return;
+    try { await apiCall("/api/admin/pools", "POST", { name: poolName, color: poolColor }); setPoolName(""); ok("Poule créée !"); }
+    catch (e) { err(e); }
+  }
+
+  async function handleDeletePool(id: string) {
+    try { await apiCall(`/api/admin/pools?id=${id}`, "DELETE"); ok("Poule supprimée."); }
+    catch (e) { err(e); }
+  }
+
+  async function handleUpdatePoolColor(id: string, color: string) {
+    try {
+      await apiCall("/api/admin/pools", "PATCH", { id, color });
+      setPoolColorEdits((prev) => { const next = { ...prev }; delete next[id]; return next; });
+      ok("Couleur mise à jour.");
+    }
+    catch (e) { err(e); }
+  }
+
+  async function handleFileUpload(file: File) {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Erreur upload");
+      const url: string = (data as { url: string }).url;
+      if (uploadTarget === "create") {
+        setTeamLogoUrl(url);
+      } else if (uploadTarget) {
+        setEditLogoUrl(url);
+      }
+    } catch (e) {
+      err(e);
     } finally {
-      setLoading(false);
+      setUploading(false);
     }
-  };
+  }
 
-  useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, 20_000);
-    return () => clearInterval(id);
-  }, []);
+  function triggerUpload(target: "create" | string) {
+    setUploadTarget(target);
+    fileInputRef.current?.click();
+  }
 
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <CardTitle className="text-base">🟢 Joueurs en ligne</CardTitle>
-        <p className="mt-1 mb-3 text-sm text-[var(--color-muted)]">
-          Actifs dans les 5 dernières minutes — pratique pour pousser une mise à
-          jour quand peu de monde joue.
-        </p>
-        <div className="flex items-center gap-3">
-          <span className="font-[family-name:var(--font-display)] text-3xl font-bold tabular-nums text-[var(--color-pitch-bright)]">
-            {data?.count ?? "—"}
-          </span>
-          <span className="text-sm text-[var(--color-muted)]">en ligne</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={refresh}
-            disabled={loading}
-            className="ml-auto"
-            aria-label="Rafraîchir"
-          >
-            <RefreshCw className={loading ? "animate-spin" : ""} />
-          </Button>
-        </div>
-        {data && data.users.length > 0 && (
-          <p className="mt-2 text-xs text-[var(--color-muted)]">
-            {data.users.join(", ")}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+  async function handleAssignTeamToPool(teamId: string, poolId: string) {
+    try { await apiCall("/api/admin/teams", "PATCH", { id: teamId, poolId: poolId || null }); ok("Équipe assignée."); }
+    catch (e) { err(e); }
+  }
 
-/* ─── Désignation manuelle du champion (finale aux tirs au but) ─── */
-function ChampionPanel({
-  teams,
-  current,
-}: {
-  teams: { team: string; flag: string }[];
-  current: { team: string; flag: string } | null;
-}) {
-  const router = useRouter();
-  const [team, setTeam] = useState(current?.team ?? teams[0]?.team ?? "");
-  const [pending, start] = useTransition();
-  const { msg, flash } = useFeedback();
+  // ── Matches ──
+  async function handleGeneratePoolMatches() {
+    try {
+      const res = await apiCall("/api/admin/generate-pool-matches", "POST");
+      ok(`${res.created} match${res.created !== 1 ? "s" : ""} de poules générés.`);
+    } catch (e) { err(e); }
+  }
 
-  const setChampion = () =>
-    start(async () => {
-      try {
-        const res = await fetch("/api/admin/champion", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ team }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok) {
-          flash("Champion désigné, bonus crédité ✅", true);
-          router.refresh();
-        } else {
-          flash(data.error ?? "Échec.", false);
-        }
-      } catch {
-        flash("Réseau indisponible.", false);
-      }
-    });
-
-  const clearChampion = () =>
-    start(async () => {
-      try {
-        const res = await fetch("/api/admin/champion", { method: "DELETE" });
-        if (res.ok) {
-          flash("Désignation annulée.", true);
-          router.refresh();
-        } else {
-          flash("Échec.", false);
-        }
-      } catch {
-        flash("Réseau indisponible.", false);
-      }
-    });
-
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <CardTitle className="text-base">🏆 Vainqueur du tournoi</CardTitle>
-        <p className="mt-1 mb-3 text-xs text-[var(--color-muted)]">
-          À n&apos;utiliser que si la <strong>finale se joue aux tirs au but</strong> :
-          le vainqueur ne peut pas être déduit du score. Désigne-le ici pour
-          créditer les <strong>+50 pts</strong> aux bons parieurs (sinon il est
-          déterminé automatiquement par le score de la finale).
-        </p>
-
-        {current && (
-          <p className="mb-3 text-sm text-[var(--color-cream)]">
-            Champion désigné : <strong>{current.team}</strong>
-          </p>
-        )}
-
-        <div className="flex gap-2">
-          <select
-            value={team}
-            onChange={(e) => setTeam(e.target.value)}
-            className="min-w-0 flex-1 truncate rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-sm outline-none focus:border-[var(--color-pitch)]"
-          >
-            {teams.map((t) => (
-              <option key={t.team} value={t.team}>
-                {t.team}
-              </option>
-            ))}
-          </select>
-          <Button onClick={setChampion} disabled={pending || !team} className="shrink-0">
-            {pending ? <Loader2 className="size-4 animate-spin" /> : "Désigner"}
-          </Button>
-        </div>
-
-        {current && (
-          <button
-            type="button"
-            onClick={clearChampion}
-            disabled={pending}
-            className="mt-2 text-xs text-[var(--color-muted)] underline hover:text-[var(--color-cream)]"
-          >
-            Annuler la désignation manuelle
-          </button>
-        )}
-
-        {msg && (
-          <p className={`mt-2 text-xs ${msg.ok ? "text-[var(--color-pitch-bright)]" : "text-red-400"}`}>
-            {msg.text}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ─── Consultation des groupes (membres + chat lecture seule) ─── */
-function GroupsPanel({ groups }: { groups: AdminGroup[] }) {
-  const { msg, flash } = useFeedback();
-  const [openId, setOpenId] = useState<string | null>(null);
-
-  const copyLink = async (name: string, token: string) => {
-    const url = `${window.location.origin}/join/${token}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: name, url });
-        return;
-      } catch {
-        // fallback
-      }
+  async function handleCreateMatch() {
+    if (!matchTeamAId || !matchTeamBId || matchTeamAId === matchTeamBId) {
+      setMessage("Sélectionne deux équipes différentes."); return;
     }
     try {
-      await navigator.clipboard.writeText(url);
-      flash(`✓ Lien de « ${name} » copié`, true);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = url;
-      ta.style.cssText = "position:fixed;opacity:0;left:-9999px";
-      document.body.appendChild(ta);
-      ta.select();
-      try {
-        document.execCommand("copy");
-        flash(`✓ Lien de « ${name} » copié`, true);
-      } catch {
-        flash("Copie ce lien : " + url, true);
-      } finally {
-        document.body.removeChild(ta);
-      }
+      await apiCall("/api/admin/matches", "POST", {
+        label: matchLabel || undefined,
+        phase: matchPhase,
+        teamAId: matchTeamAId,
+        teamASource: matchTeamASource,
+        teamBId: matchTeamBId,
+        teamBSource: matchTeamBSource,
+        scheduledAt: matchScheduledAt || null,
+      });
+      setMatchLabel(""); setMatchTeamAId(""); setMatchTeamBId(""); setMatchScheduledAt("");
+      ok("Match créé !");
+    } catch (e) { err(e); }
+  }
+
+  async function handleSaveMatchDate(matchId: string) {
+    try {
+      await apiCall("/api/admin/matches", "PATCH", {
+        id: matchId,
+        scheduledAt: editDateValue || null,
+      });
+      setEditDateMatchId(null);
+      ok("Date mise à jour.");
+    } catch (e) { err(e); }
+  }
+
+  async function handleDeleteMatch(id: string) {
+    try { await apiCall(`/api/admin/matches?id=${id}`, "DELETE"); ok("Match supprimé."); }
+    catch (e) { err(e); }
+  }
+
+  // ── Results ──
+  async function handleSubmitResult() {
+    if (!resultMatchId) return;
+    try {
+      await apiCall("/api/admin/matches", "PATCH", {
+        id: resultMatchId,
+        scoreA: resultScoreA,
+        scoreB: resultScoreB,
+        result: resultWinner,
+      });
+      setResultMatchId(""); setResultScoreA(0); setResultScoreB(0);
+      ok("Résultat enregistré ! Paris réglés.");
+    } catch (e) { err(e); }
+  }
+
+  // ── Users ──
+  async function handleCreateUser() {
+    if (!newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
+      setMessage("Remplis tous les champs."); return;
     }
+    try {
+      await apiCall("/api/admin/users", "POST", {
+        name: newUserName, email: newUserEmail, password: newUserPassword, role: newUserRole,
+      });
+      setNewUserName(""); setNewUserEmail(""); setNewUserPassword(""); setNewUserRole("USER");
+      ok("Joueur créé !");
+    } catch (e) { err(e); }
+  }
+
+  async function handleToggleBan(userId: string, banned: boolean) {
+    try { await apiCall("/api/admin/users", "PATCH", { id: userId, banned: !banned }); ok(banned ? "Joueur débanni." : "Joueur banni."); }
+    catch (e) { err(e); }
+  }
+
+  const pendingMatches = matches.filter((m) => m.status === "SCHEDULED" || m.status === "LIVE");
+  const poolMatches = matches.filter((m) => m.phase === "POOL");
+  const bracketMatches = matches.filter((m) => m.phase !== "POOL");
+
+  const selectedMatchForResult = pendingMatches.find((m) => m.id === resultMatchId);
+  const allowDrawResult = selectedMatchForResult?.phase === "POOL";
+  const resultChoices: Array<"TEAM_A" | "DRAW" | "TEAM_B"> = allowDrawResult
+    ? ["TEAM_A", "DRAW", "TEAM_B"]
+    : ["TEAM_A", "TEAM_B"];
+
+  const formatDate = (d: Date | string | null) => {
+    if (!d) return null;
+    return new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   };
 
   return (
-    <Card>
-      <CardContent className="p-4">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Users className="size-4 text-[var(--color-pitch-bright)]" />
-          Groupes ({groups.length})
-        </CardTitle>
-        {groups.length === 0 ? (
-          <p className="mt-3 text-sm text-[var(--color-muted)]">Aucun groupe.</p>
-        ) : (
-          <div className="mt-3 flex flex-col gap-2">
-            {groups.map((g) => {
-              const open = openId === g.id;
-              return (
-                <div
-                  key={g.id}
-                  className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)]"
-                >
-                  {/* En-tête cliquable */}
-                  <button
-                    type="button"
-                    onClick={() => setOpenId(open ? null : g.id)}
-                    className="flex w-full items-center gap-2 p-2.5 text-left"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{g.name}</p>
-                      <p className="text-xs text-[var(--color-muted)]">
-                        {g.memberCount} membre{g.memberCount > 1 ? "s" : ""}
-                        {g.createdByName ? ` · ${g.createdByName}` : ""}
-                        {g.recentMessages.length > 0 && (
-                          <>
-                            {" · "}
-                            <MessageSquare className="mb-0.5 inline size-3" />
-                            {g.recentMessages.length}
-                          </>
-                        )}
-                      </p>
-                    </div>
-                    <ChevronDown
-                      className={`size-4 shrink-0 text-[var(--color-muted)] transition-transform ${open ? "rotate-180" : ""}`}
-                    />
-                  </button>
-
-                  {/* Détail dépliable */}
-                  {open && (
-                    <div className="border-t border-[var(--color-border-subtle)] px-2.5 pb-2.5 pt-2">
-                      {/* Membres */}
-                      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
-                        Membres
-                      </p>
-                      <div className="mb-3 flex flex-col gap-1">
-                        {g.members.map((m) => (
-                          <div
-                            key={m.id}
-                            className="flex items-center gap-2 rounded-lg bg-[var(--color-surface)] px-2 py-1"
-                          >
-                            <span className="truncate text-xs font-medium">
-                              {m.name}
-                            </span>
-                            {m.role === "OWNER" && (
-                              <span className="rounded bg-[var(--color-gold)]/15 px-1 py-0.5 text-[8px] font-bold uppercase text-[var(--color-gold)]">
-                                Owner
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Derniers messages */}
-                      {g.recentMessages.length > 0 ? (
-                        <>
-                          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
-                            Derniers messages
-                          </p>
-                          <div className="flex flex-col gap-1">
-                            {g.recentMessages.map((m) => (
-                              <div
-                                key={m.id}
-                                className="rounded-lg bg-[var(--color-surface)] px-2 py-1.5"
-                              >
-                                <span className="text-xs font-semibold text-[var(--color-pitch-bright)]">
-                                  {m.userName}
-                                </span>
-                                <span className="ml-1.5 text-xs text-[var(--color-cream)]">
-                                  {m.content}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      ) : (
-                        <p className="text-xs text-[var(--color-muted)]">
-                          Aucun message.
-                        </p>
-                      )}
-
-                      {/* Lien d'invitation */}
-                      <button
-                        type="button"
-                        onClick={() => copyLink(g.name, g.token)}
-                        className="mt-3 flex items-center gap-1.5 rounded-lg border border-[var(--color-border-subtle)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-muted)] transition-colors hover:text-[var(--color-cream)]"
-                      >
-                        <Copy className="size-3" />
-                        Copier le lien
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {msg && (
-          <p
-            className={`mt-2 text-sm ${msg.ok ? "text-[var(--color-pitch-bright)]" : "text-red-400"}`}
-          >
-            {msg.text}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ─── Remise à zéro (zone dangereuse) ─── */
-function ResetPanel() {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const { msg, flash } = useFeedback();
-
-  const reset = () =>
-    start(async () => {
-      if (
-        !confirm(
-          "⚠️ REMISE À ZÉRO\n\nEfface TOUS les pronos, résultats, scores, messages et badges.\nLes comptes, les matchs et les groupes sont conservés.\n\nContinuer ?"
-        )
-      )
-        return;
-      if (!confirm("Dernière confirmation : cette action est IRRÉVERSIBLE. Tout effacer ?"))
-        return;
-      try {
-        const res = await fetch("/api/admin/reset", { method: "POST" });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Erreur");
-        flash(
-          `✓ Remis à zéro : ${data.predictions} pronos, ${data.results} résultats, ${data.messages} messages effacés.`,
-          true
-        );
-        router.refresh();
-      } catch (e) {
-        flash(e instanceof Error ? e.message : "Erreur", false);
-      }
-    });
-
-  return (
-    <Card className="border-red-500/30 bg-red-500/[0.04]">
-      <CardContent className="p-4">
-        <CardTitle className="text-base text-red-400">🧨 Remise à zéro</CardTitle>
-        <p className="mt-1 mb-3 text-sm text-[var(--color-muted)]">
-          Repart à 0 une fois les tests finis : efface pronos, résultats, scores,
-          messages et badges. <strong className="text-[var(--color-cream)]">Conserve</strong> les
-          comptes, les matchs et les groupes.
-        </p>
-        <Button variant="danger" size="sm" onClick={reset} disabled={pending}>
-          {pending ? <Loader2 className="animate-spin" /> : <Trash2 />}
-          Tout remettre à zéro
-        </Button>
-        {msg && (
-          <p
-            className={`mt-2 text-sm ${msg.ok ? "text-[var(--color-pitch-bright)]" : "text-red-400"}`}
-          >
-            {msg.text}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ─── Génération d'un lien d'invitation ─── */
-function InvitePanel() {
-  const [pending, start] = useTransition();
-  const { msg, flash } = useFeedback();
-  const [link, setLink] = useState("");
-
-  const generate = () =>
-    start(async () => {
-      try {
-        const res = await fetch("/api/admin/invite", { method: "POST" });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Erreur");
-        const url = `${window.location.origin}/invite/${data.token}`;
-        setLink(url);
-        try {
-          await navigator.clipboard.writeText(url);
-          flash("✓ Lien copié dans le presse-papier", true);
-        } catch {
-          flash("Lien généré (copie manuelle)", true);
-        }
-      } catch (e) {
-        flash(e instanceof Error ? e.message : "Erreur", false);
-      }
-    });
-
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <CardTitle className="text-base">✉️ Inviter des joueurs</CardTitle>
-        <p className="mt-1 mb-3 text-sm text-[var(--color-muted)]">
-          Génère un lien à partager (20 usages, valable 30 jours).
-        </p>
-        <Button variant="primary" size="sm" onClick={generate} disabled={pending}>
-          {pending ? <Loader2 className="animate-spin" /> : <Check />}
-          Générer un lien
-        </Button>
-        {link && (
-          <p className="mt-2 break-all rounded-lg bg-[var(--color-surface-2)] p-2 font-[family-name:var(--font-mono)] text-xs text-[var(--color-pitch-bright)]">
-            {link}
-          </p>
-        )}
-        {msg && (
-          <p
-            className={`mt-2 text-sm ${msg.ok ? "text-[var(--color-pitch-bright)]" : "text-red-400"}`}
-          >
-            {msg.text}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ─── Clôture du tournoi (badge daronissime) ─── */
-function CloseTournamentPanel() {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const { msg, flash } = useFeedback();
-
-  const close = () =>
-    start(async () => {
-      if (
-        !confirm(
-          "Décerner le titre de Daronissime 👑 au leader de CHAQUE groupe (un vainqueur par groupe) ?"
-        )
-      )
-        return;
-      try {
-        const res = await fetch("/api/admin/close-tournament", { method: "POST" });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Erreur");
-        const detail = (data.champions ?? [])
-          .map((c: { group: string; champion: string }) => `${c.group} → ${c.champion}`)
-          .join(" · ");
-        flash(
-          `👑 Daronissime décerné dans ${data.winners} groupe(s)${detail ? ` : ${detail}` : ""} !`,
-          true
-        );
-        router.refresh();
-      } catch (e) {
-        flash(e instanceof Error ? e.message : "Erreur", false);
-      }
-    });
-
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <CardTitle className="text-base">👑 Clôturer le tournoi</CardTitle>
-        <p className="mt-1 mb-3 text-sm text-[var(--color-muted)]">
-          Décerne le badge Daronissime au 1ᵉʳ du classement de chaque groupe
-          (un vainqueur par groupe). À faire en fin de Coupe du Monde.
-        </p>
-        <Button variant="gold" size="sm" onClick={close} disabled={pending}>
-          {pending ? <Loader2 className="animate-spin" /> : <Check />}
-          Sacrer le Daronissime
-        </Button>
-        {msg && (
-          <p
-            className={`mt-2 text-sm ${msg.ok ? "text-[var(--color-pitch-bright)]" : "text-red-400"}`}
-          >
-            {msg.text}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ─── Feedback inline ─── */
-function useFeedback() {
-  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
-  const flash = (text: string, ok: boolean) => {
-    setMsg({ text, ok });
-    setTimeout(() => setMsg(null), 4000);
-  };
-  return { msg, flash };
-}
-
-/* ─── Synchronisation manuelle ─── */
-function SyncPanel() {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const { msg, flash } = useFeedback();
-
-  const sync = () =>
-    start(async () => {
-      try {
-        const res = await fetch("/api/sync", { method: "POST" });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Erreur");
-        flash(`✓ ${data.matches} matchs, ${data.results} résultats`, true);
-        router.refresh();
-      } catch (e) {
-        flash(e instanceof Error ? e.message : "Erreur", false);
-      }
-    });
-
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <CardTitle className="text-base">⚽ Synchronisation</CardTitle>
-        <p className="mt-1 mb-3 text-sm text-[var(--color-muted)]">
-          Force une mise à jour immédiate des matchs et scores depuis l&apos;API.
-        </p>
-        <Button variant="primary" size="sm" onClick={sync} disabled={pending}>
-          {pending ? (
-            <Loader2 className="animate-spin" />
-          ) : (
-            <RefreshCw />
-          )}
-          Synchroniser maintenant
-        </Button>
-        {msg && (
-          <p
-            className={`mt-2 text-sm ${msg.ok ? "text-[var(--color-pitch-bright)]" : "text-red-400"}`}
-          >
-            {msg.text}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ─── Saisie / correction manuelle d'un score ─── */
-function ManualScorePanel({ matches }: { matches: AdminMatchResult[] }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const { msg, flash } = useFeedback();
-  const [matchId, setMatchId] = useState(matches[0]?.id ?? "");
-  const [saved, setSaved] = useState(false);
-  const selected = matches.find((m) => m.id === matchId);
-  // Un match dont le résultat est déjà enregistré est verrouillé : pas de
-  // correction (ni commencé, ni fini). Seule la 1re saisie est possible.
-  const locked = selected != null && selected.homeScore != null;
-  const [home, setHome] = useState(
-    selected?.homeScore != null ? String(selected.homeScore) : ""
-  );
-  const [away, setAway] = useState(
-    selected?.awayScore != null ? String(selected.awayScore) : ""
-  );
-
-  const onSelect = (id: string) => {
-    setMatchId(id);
-    setSaved(false);
-    const m = matches.find((x) => x.id === id);
-    setHome(m?.homeScore != null ? String(m.homeScore) : "");
-    setAway(m?.awayScore != null ? String(m.awayScore) : "");
-  };
-
-  /** Auto-enregistrement (anti-rebond) de la première saisie d'un résultat. */
-  useEffect(() => {
-    setSaved(false);
-    if (locked) return;
-    if (home === "" || away === "") return;
-    const h = Number(home);
-    const a = Number(away);
-    if (!Number.isInteger(h) || !Number.isInteger(a)) return;
-    if (h < 0 || a < 0 || h > 99 || a > 99) return;
-    const t = setTimeout(
-      () =>
-        start(async () => {
-          try {
-            const res = await fetch("/api/admin/result", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ matchId, homeScore: h, awayScore: a }),
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error ?? "Erreur");
-            setSaved(true);
-            flash(`✓ Résultat enregistré (${data.scored} pronos crédités)`, true);
-            router.refresh();
-          } catch (e) {
-            flash(e instanceof Error ? e.message : "Erreur", false);
-          }
-        }),
-      700
-    );
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [home, away, matchId, locked]);
-
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <CardTitle className="text-base">📝 Score manuel</CardTitle>
-        <p className="mt-1 mb-3 text-sm text-[var(--color-muted)]">
-          Saisis un résultat si l&apos;API est en retard : il s&apos;enregistre
-          automatiquement. Un match dont le résultat est déjà enregistré est
-          verrouillé (pas de correction).
-        </p>
-
-        {matches.length === 0 ? (
-          <p className="text-sm text-[var(--color-muted)]">
-            Aucun match commencé pour l&apos;instant.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <select
-              value={matchId}
-              onChange={(e) => onSelect(e.target.value)}
-              className="h-11 w-full min-w-0 truncate rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 text-sm text-[var(--color-cream)]"
-            >
-              {matches.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.homeTeam} – {m.awayTeam}
-                  {m.finished ? "  ✓ terminé" : ""}
-                </option>
-              ))}
-            </select>
-
-            {locked && (
-              <p className="rounded-lg bg-[var(--color-gold)]/10 px-3 py-2 text-xs text-[var(--color-gold)]">
-                🔒 Résultat déjà enregistré — verrouillé (pas de correction).
-              </p>
-            )}
-
-            <div className="flex items-center justify-center gap-3">
-              <input
-                type="number"
-                min={0}
-                max={99}
-                value={home}
-                onChange={(e) => setHome(e.target.value)}
-                disabled={locked}
-                placeholder="0"
-                className="h-14 w-16 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] text-center text-2xl font-bold text-[var(--color-cream)] disabled:opacity-60"
-              />
-              <span className="text-xl font-bold text-[var(--color-muted)]">–</span>
-              <input
-                type="number"
-                min={0}
-                max={99}
-                value={away}
-                onChange={(e) => setAway(e.target.value)}
-                disabled={locked}
-                placeholder="0"
-                className="h-14 w-16 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] text-center text-2xl font-bold text-[var(--color-cream)] disabled:opacity-60"
-              />
-            </div>
-
-            {!locked && (
-              <p className="flex items-center justify-center gap-1.5 text-sm text-[var(--color-muted)]">
-                {pending ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" /> Enregistrement…
-                  </>
-                ) : saved ? (
-                  <span className="text-[var(--color-pitch-bright)]">
-                    ✓ Enregistré automatiquement
-                  </span>
-                ) : (
-                  "Le score s'enregistre tout seul"
-                )}
-              </p>
-            )}
-          </div>
-        )}
-
-        {msg && (
-          <p
-            className={`mt-2 text-sm ${msg.ok ? "text-[var(--color-pitch-bright)]" : "text-red-400"}`}
-          >
-            {msg.text}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ─── Saisie/backfill manuel des cotes 1X2 d'un match ─── */
-function OddsPanel({ matches }: { matches: AdminMatchResult[] }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const { msg, flash } = useFeedback();
-  const [matchId, setMatchId] = useState(matches[0]?.id ?? "");
-  const selected = matches.find((m) => m.id === matchId);
-  const [h, setH] = useState(selected?.oddsHome != null ? String(selected.oddsHome) : "");
-  const [d, setD] = useState(selected?.oddsDraw != null ? String(selected.oddsDraw) : "");
-  const [a, setA] = useState(selected?.oddsAway != null ? String(selected.oddsAway) : "");
-
-  const onSelect = (id: string) => {
-    setMatchId(id);
-    const m = matches.find((x) => x.id === id);
-    setH(m?.oddsHome != null ? String(m.oddsHome) : "");
-    setD(m?.oddsDraw != null ? String(m.oddsDraw) : "");
-    setA(m?.oddsAway != null ? String(m.oddsAway) : "");
-  };
-
-  const submit = () =>
-    start(async () => {
-      // Tolère la virgule décimale (4,5 → 4.5) en plus du point.
-      const oddsHome = Number(h.replace(",", "."));
-      const oddsDraw = Number(d.replace(",", "."));
-      const oddsAway = Number(a.replace(",", "."));
-      if (!matchId || ![oddsHome, oddsDraw, oddsAway].every((x) => x > 1)) {
-        flash("Saisis les 3 cotes décimales (> 1, ex. 1.85).", false);
-        return;
-      }
-      try {
-        const res = await fetch("/api/admin/odds", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ matchId, oddsHome, oddsDraw, oddsAway }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Erreur");
-        flash(
-          data.finished
-            ? `✓ Cotes enregistrées (${data.scored} pronos recalculés)`
-            : "✓ Cotes enregistrées",
-          true
-        );
-        router.refresh();
-      } catch (e) {
-        flash(e instanceof Error ? e.message : "Erreur", false);
-      }
-    });
-
-  // Capture immédiate de toutes les cotes depuis l'API (force un snapshot).
-  const syncAll = () =>
-    start(async () => {
-      try {
-        const res = await fetch("/api/admin/odds/sync", { method: "POST" });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Erreur");
-        flash(
-          `✓ ${data.updated} match(s) coté(s)` +
-            (data.unmatchedSoon?.length
-              ? ` · ${data.unmatchedSoon.length} sans cote`
-              : ""),
-          true
-        );
-        router.refresh();
-      } catch (e) {
-        flash(e instanceof Error ? e.message : "Erreur", false);
-      }
-    });
-
-  const oddInput = (
-    label: string,
-    value: string,
-    onChange: (v: string) => void
-  ) => (
-    <label className="flex flex-col gap-1 text-center">
-      <span className="truncate text-xs text-[var(--color-muted)]">{label}</span>
+    <div className="space-y-4">
+      {/* Input fichier caché — partagé par tous les logos */}
       <input
-        type="text"
-        inputMode="decimal"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="1.85"
-        className="h-11 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] text-center text-sm font-bold text-[var(--color-cream)]"
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFileUpload(file);
+          e.target.value = "";
+        }}
       />
-    </label>
-  );
 
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <CardTitle className="text-base">🎲 Cotes</CardTitle>
-        <p className="mt-1 mb-3 text-sm text-[var(--color-muted)]">
-          Synchronise toutes les cotes depuis l&apos;API, ou saisis-les à la main
-          (backfill). Un match terminé voit ses points recalculés.
-        </p>
-
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={syncAll}
-          disabled={pending}
-          className="mb-4"
-        >
-          {pending ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-          Synchroniser toutes les cotes
-        </Button>
-
-        {matches.length === 0 ? (
-          <p className="text-sm text-[var(--color-muted)]">
-            Aucun match commencé pour l&apos;instant.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <select
-              value={matchId}
-              onChange={(e) => onSelect(e.target.value)}
-              className="h-11 w-full min-w-0 truncate rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 text-sm text-[var(--color-cream)]"
-            >
-              {matches.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.homeTeam} – {m.awayTeam}
-                  {m.oddsHome != null ? "  ✓ cotée" : ""}
-                  {m.finished ? "  · terminé" : ""}
-                </option>
-              ))}
-            </select>
-
-            <div className="grid grid-cols-3 gap-2">
-              {oddInput(selected?.homeTeam ?? "Domicile", h, setH)}
-              {oddInput("Nul", d, setD)}
-              {oddInput(selected?.awayTeam ?? "Extérieur", a, setA)}
-            </div>
-
-            <Button variant="gold" size="sm" onClick={submit} disabled={pending}>
-              {pending ? <Loader2 className="animate-spin" /> : <Check />}
-              Enregistrer les cotes
-            </Button>
-          </div>
-        )}
-
-        {msg && (
-          <p
-            className={`mt-2 text-sm ${msg.ok ? "text-[var(--color-pitch-bright)]" : "text-red-400"}`}
+      {/* Tabs */}
+      <div className="flex gap-1 overflow-x-auto pb-1">
+        {TABS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors",
+              tab === key
+                ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
+                : "text-[var(--color-muted)] hover:text-[var(--color-cream)]"
+            )}
           >
-            {msg.text}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+            <Icon className="size-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
 
-/* ─── Annonce admin : message « DaronsFC » dans tous les tchats ─── */
-function BroadcastPanel() {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const { msg, flash } = useFeedback();
-  const [text, setText] = useState("");
+      {message && (
+        <div className="rounded-lg bg-[var(--color-accent)]/10 p-2 text-xs text-[var(--color-accent)]">
+          {message}
+          <button onClick={() => setMessage(null)} className="ml-2 underline">OK</button>
+        </div>
+      )}
 
-  const send = () =>
-    start(async () => {
-      const content = text.trim();
-      if (!content) {
-        flash("Message vide.", false);
-        return;
-      }
-      if (
-        !confirm(
-          `Envoyer cette annonce dans le tchat de TOUS les groupes ?\n\n« ${content.slice(0, 140)} »`
-        )
-      )
-        return;
-      try {
-        const res = await fetch("/api/admin/broadcast", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Erreur");
-        flash(
-          `✓ Annonce envoyée à ${data.groups} groupe(s) · ${data.users} joueur(s) notifié(s).`,
-          true
-        );
-        setText("");
-        router.refresh();
-      } catch (e) {
-        flash(e instanceof Error ? e.message : "Erreur", false);
-      }
-    });
-
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <CardTitle className="text-base">📢 Annonce à tous les groupes</CardTitle>
-        <p className="mt-1 mb-3 text-sm text-[var(--color-muted)]">
-          Poste un message « DaronsFC » en bandeau dans le tchat de chaque groupe
-          (mise à jour, info…) et notifie les joueurs par push.
-        </p>
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          maxLength={1000}
-          rows={3}
-          placeholder="Ex. Mise à jour : les cotes sont maintenant affichées sur chaque match ⚽"
-          className="mb-2 w-full resize-none rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] p-3 text-sm text-[var(--color-cream)] outline-none focus:border-[var(--color-pitch)]"
-        />
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={send}
-          disabled={pending || !text.trim()}
-        >
-          {pending ? <Loader2 className="animate-spin" /> : <MessageSquare />}
-          Envoyer l&apos;annonce
-        </Button>
-        {msg && (
-          <p
-            className={`mt-2 text-sm ${msg.ok ? "text-[var(--color-pitch-bright)]" : "text-red-400"}`}
-          >
-            {msg.text}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ─── Recalcul global des points (changement de barème) ─── */
-function RescorePanel() {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const { msg, flash } = useFeedback();
-
-  const rescore = () =>
-    start(async () => {
-      if (
-        !confirm(
-          "Recalculer TOUS les points à partir des résultats enregistrés ?\n\nUtile après un changement de barème. Sans danger : l'opération est idempotente."
-        )
-      )
-        return;
-      try {
-        const res = await fetch("/api/admin/rescore", { method: "POST" });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Erreur");
-        flash(
-          `✓ ${data.matches} matchs ré-appliqués, ${data.predictions} pronos recalculés.`,
-          true
-        );
-        router.refresh();
-      } catch (e) {
-        flash(e instanceof Error ? e.message : "Erreur", false);
-      }
-    });
-
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <CardTitle className="text-base">♻️ Recalculer les points</CardTitle>
-        <p className="mt-1 mb-3 text-sm text-[var(--color-muted)]">
-          Ré-applique le barème actuel à tous les matchs terminés (à lancer
-          après une mise à jour des règles de calcul).
-        </p>
-        <Button variant="primary" size="sm" onClick={rescore} disabled={pending}>
-          {pending ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-          Tout recalculer
-        </Button>
-        {msg && (
-          <p
-            className={`mt-2 text-sm ${msg.ok ? "text-[var(--color-pitch-bright)]" : "text-red-400"}`}
-          >
-            {msg.text}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ─── Import d'un prono pour un joueur ─── */
-function ImportPredictionPanel({
-  users,
-  matches,
-  predictions,
-}: {
-  users: AdminUser[];
-  matches: AdminMatchBrief[];
-  predictions: AdminPredictionMap;
-}) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const { msg, flash } = useFeedback();
-  const [userId, setUserId] = useState(users[0]?.id ?? "");
-  const [matchId, setMatchId] = useState(matches[0]?.id ?? "");
-  const [home, setHome] = useState("");
-  const [away, setAway] = useState("");
-  const [joker, setJoker] = useState(false);
-
-  const existing = userId && matchId ? predictions[`${userId}|${matchId}`] : undefined;
-
-  const onSelectMatch = (id: string) => {
-    setMatchId(id);
-    setHome("");
-    setAway("");
-    setJoker(false);
-  };
-
-  const submit = () =>
-    start(async () => {
-      if (!userId || !matchId || home === "" || away === "") {
-        flash("Choisis un joueur, un match et les deux scores.", false);
-        return;
-      }
-      try {
-        const res = await fetch("/api/admin/prediction", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId,
-            matchId,
-            homeScore: Number(home),
-            awayScore: Number(away),
-            joker,
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Erreur");
-        if (data.warning) {
-          flash(data.warning, false);
-        } else {
-          flash(
-            data.scored > 0
-              ? "✓ Prono importé et crédité"
-              : data.alreadyScored
-                ? "✓ Prono mis à jour (points déjà comptés)"
-                : "✓ Prono importé",
-            true
-          );
-        }
-        setHome("");
-        setAway("");
-        setJoker(false);
-        router.refresh();
-      } catch (e) {
-        flash(e instanceof Error ? e.message : "Erreur", false);
-      }
-    });
-
-  const hasCount = userId
-    ? matches.filter((m) => predictions[`${userId}|${m.id}`]).length
-    : 0;
-
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <CardTitle className="text-base">📥 Import prono</CardTitle>
-        <p className="mt-1 mb-3 text-sm text-[var(--color-muted)]">
-          Reprends le prono d&apos;un joueur (autre appli). Verrou de coup
-          d&apos;envoi ignoré ; crédité si le match est terminé.
-        </p>
-
-        {users.length === 0 || matches.length === 0 ? (
-          <p className="text-sm text-[var(--color-muted)]">
-            Aucun joueur ou aucun match disponible.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {/* Joueur */}
-            <select
-              value={userId}
-              onChange={(e) => {
-                setUserId(e.target.value);
-                setHome("");
-                setAway("");
-                setJoker(false);
-              }}
-              className="h-11 w-full min-w-0 truncate rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 text-sm text-[var(--color-cream)]"
-            >
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} ({u.email})
-                </option>
-              ))}
-            </select>
-
-            {/* Compteur de pronos */}
-            <p className="text-xs text-[var(--color-muted)]">
-              {hasCount}/{matches.length} pronos effectués
-            </p>
-
-            {/* Liste des matchs avec statut */}
-            <div className="flex max-h-52 flex-col gap-1 overflow-y-auto rounded-xl border border-[var(--color-border-subtle)] p-1.5">
-              {matches.map((m) => {
-                const pred = userId ? predictions[`${userId}|${m.id}`] : undefined;
-                const selected = m.id === matchId;
-                return (
+      {/* ── Teams ── */}
+      {tab === "teams" && (
+        <div className="space-y-4">
+          {/* Créer une équipe */}
+          <Card className="p-3 space-y-2">
+            <h3 className="text-sm font-semibold">Créer une équipe</h3>
+            <div className="flex gap-3 items-start">
+              {/* Aperçu logo création — cliquable pour uploader */}
+              <button
+                type="button"
+                onClick={() => triggerUpload("create")}
+                disabled={uploading}
+                className="shrink-0 relative group size-14 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] overflow-hidden flex items-center justify-center"
+                title="Uploader une image"
+              >
+                {teamLogoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={teamLogoUrl}
+                    alt="aperçu"
+                    className="size-full object-contain"
+                    onError={(e) => { e.currentTarget.style.opacity = "0.2"; }}
+                  />
+                ) : (
+                  <ImageIcon className="size-5 text-[var(--color-muted)]" />
+                )}
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Upload className="size-4 text-white" />
+                </div>
+              </button>
+              <div className="flex-1 space-y-2">
+                <input placeholder="Nom de l'équipe *" value={teamName} onChange={(e) => setTeamName(e.target.value)}
+                  className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" />
+                <input placeholder="Joueur 1 (optionnel)" value={teamPlayer1} onChange={(e) => setTeamPlayer1(e.target.value)}
+                  className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" />
+                <input placeholder="Joueur 2 (optionnel)" value={teamPlayer2} onChange={(e) => setTeamPlayer2(e.target.value)}
+                  className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" />
+                <div className="flex gap-1.5">
+                  <input
+                    type="url"
+                    placeholder="URL du logo (https://...)"
+                    value={teamLogoUrl}
+                    onChange={(e) => setTeamLogoUrl(e.target.value)}
+                    className="flex-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-sm"
+                  />
                   <button
-                    key={m.id}
                     type="button"
-                    onClick={() => onSelectMatch(m.id)}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors ${
-                      selected
-                        ? "bg-[var(--color-pitch)]/15"
-                        : "hover:bg-[var(--color-surface-2)]"
-                    }`}
+                    onClick={() => triggerUpload("create")}
+                    disabled={uploading}
+                    className="shrink-0 flex items-center gap-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2.5 py-2 text-xs text-[var(--color-muted)] hover:text-[var(--color-cream)] disabled:opacity-40"
+                    title="Uploader JPG/PNG"
                   >
-                    <span className="shrink-0">
-                      {pred ? (
-                        <Check className="size-4 text-[var(--color-pitch-bright)]" />
-                      ) : (
-                        <span className="block size-4 rounded-full border-2 border-[var(--color-border-subtle)]" />
-                      )}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className={`truncate text-xs ${selected ? "font-bold" : "font-medium"}`}>
-                        {m.homeTeam} – {m.awayTeam}
-                      </p>
-                      <p className="text-[10px] text-[var(--color-muted)]">
-                        {pred
-                          ? `${pred.homeScore}-${pred.awayScore}${pred.joker ? " 🃏" : ""}`
-                          : m.finished
-                            ? "terminé"
-                            : "à venir"}
-                      </p>
+                    <Upload className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <Button onClick={handleCreateTeam} className="w-full text-xs">
+              <Plus className="size-3.5 mr-1" /> Créer
+            </Button>
+          </Card>
+
+          {/* Liste équipes */}
+          <div className="space-y-1">
+            {teams.map((team) => (
+              <Card key={team.id} className="p-3 space-y-2">
+                <div className="flex items-start gap-3">
+                  {/* Logo cliquable pour éditer */}
+                  <button
+                    onClick={() => {
+                      if (editLogoTeamId === team.id) {
+                        setEditLogoTeamId(null);
+                      } else {
+                        setEditLogoTeamId(team.id);
+                        setEditLogoUrl(team.logoUrl ?? "");
+                      }
+                    }}
+                    className="shrink-0 relative group size-12 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] overflow-hidden flex items-center justify-center"
+                    title="Modifier le logo"
+                  >
+                    {team.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={team.logoUrl} alt={team.name} className="size-full object-contain" />
+                    ) : (
+                      <ImageIcon className="size-4 text-[var(--color-muted)]" />
+                    )}
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-[9px] text-white font-medium">URL</span>
                     </div>
                   </button>
-                );
-              })}
-            </div>
 
-            {/* Saisie du score */}
-            <div className="flex items-center justify-center gap-3">
-              <input
-                type="number"
-                min={0}
-                max={20}
-                value={home}
-                onChange={(e) => setHome(e.target.value)}
-                placeholder={existing ? String(existing.homeScore) : "0"}
-                className="h-14 w-16 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] text-center text-2xl font-bold text-[var(--color-cream)]"
-              />
-              <span className="text-xl font-bold text-[var(--color-muted)]">–</span>
-              <input
-                type="number"
-                min={0}
-                max={20}
-                value={away}
-                onChange={(e) => setAway(e.target.value)}
-                placeholder={existing ? String(existing.awayScore) : "0"}
-                className="h-14 w-16 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] text-center text-2xl font-bold text-[var(--color-cream)]"
-              />
-            </div>
+                  {/* Info + pool */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{team.name}</p>
+                    <p className="text-[10px] text-[var(--color-muted)]">
+                      {[team.player1, team.player2].filter(Boolean).join(" & ") || "—"}
+                    </p>
+                    <select
+                      value={team.poolId ?? ""}
+                      onChange={(e) => handleAssignTeamToPool(team.id, e.target.value)}
+                      className="mt-1 rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2 py-0.5 text-[10px]"
+                    >
+                      <option value="">Pas de poule</option>
+                      {pools.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
 
-            <label className="flex cursor-pointer items-center justify-center gap-2 text-sm text-[var(--color-muted)]">
-              <input
-                type="checkbox"
-                checked={joker}
-                onChange={(e) => setJoker(e.target.checked)}
-                className="size-4 accent-[var(--color-gold)]"
-              />
-              🃏 Joker (×2)
-            </label>
+                  <button onClick={() => handleDeleteTeam(team.id)} className="shrink-0 text-red-400 hover:text-red-300 mt-0.5">
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
 
-            <Button variant="gold" size="sm" onClick={submit} disabled={pending}>
-              {pending ? <Loader2 className="animate-spin" /> : <Check />}
-              Importer le prono
-            </Button>
+                {/* Éditeur de logo inline */}
+                {editLogoTeamId === team.id && (
+                  <div className="flex flex-col gap-2 pt-1 border-t border-[var(--color-border-subtle)]">
+                    <p className="text-[10px] text-[var(--color-muted)]">URL du logo</p>
+                    <div className="flex gap-2 items-start">
+                      {/* Aperçu live */}
+                      <div className="shrink-0 size-14 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] overflow-hidden flex items-center justify-center">
+                        {editLogoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={editLogoUrl}
+                            alt="aperçu"
+                            className="size-full object-contain"
+                            onError={(e) => { e.currentTarget.style.opacity = "0.15"; }}
+                          />
+                        ) : (
+                          <ImageIcon className="size-4 text-[var(--color-muted)]" />
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-1.5">
+                        <div className="flex gap-1.5">
+                          <input
+                            type="url"
+                            placeholder="https://..."
+                            value={editLogoUrl}
+                            onChange={(e) => setEditLogoUrl(e.target.value)}
+                            className="flex-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-xs"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => triggerUpload(team.id)}
+                            disabled={uploading}
+                            className="shrink-0 flex items-center gap-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2.5 text-[var(--color-muted)] hover:text-[var(--color-cream)] disabled:opacity-40"
+                            title="Uploader JPG/PNG"
+                          >
+                            {uploading && uploadTarget === team.id
+                              ? <span className="text-[9px]">…</span>
+                              : <Upload className="size-3.5" />}
+                          </button>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleSaveLogo(team.id, editLogoUrl)}
+                            className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-[var(--color-accent)]/10 px-3 py-1.5 text-xs font-medium text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20"
+                          >
+                            <Check className="size-3" /> Sauvegarder
+                          </button>
+                          <button
+                            onClick={() => setEditLogoTeamId(null)}
+                            className="flex items-center justify-center rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 text-[var(--color-muted)] hover:text-[var(--color-cream)]"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {msg && (
-          <p
-            className={`mt-2 text-sm ${msg.ok ? "text-[var(--color-pitch-bright)]" : "text-red-400"}`}
-          >
-            {msg.text}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+      {/* ── Pools ── */}
+      {tab === "pools" && (
+        <div className="space-y-4">
+          <Card className="p-3 space-y-2">
+            <h3 className="text-sm font-semibold">Créer une poule</h3>
+            <div className="flex gap-2">
+              <input placeholder="Nom (ex: Poule A)" value={poolName} onChange={(e) => setPoolName(e.target.value)}
+                className="flex-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" />
+              <div className="relative shrink-0">
+                <input type="color" value={poolColor} onChange={(e) => setPoolColor(e.target.value)}
+                  className="size-9 cursor-pointer rounded-lg border border-[var(--color-border-subtle)] p-0.5 bg-[var(--color-surface-2)]" />
+              </div>
+            </div>
+            <Button onClick={handleCreatePool} className="w-full text-xs">
+              <Plus className="size-3.5 mr-1" /> Créer
+            </Button>
+          </Card>
 
-/* ─── Gestion des utilisateurs ─── */
-function UsersPanel({
-  users,
-  currentUserId,
-}: {
-  users: AdminUser[];
-  currentUserId: string;
-}) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const { msg, flash } = useFeedback();
-  const [busyId, setBusyId] = useState<string | null>(null);
-
-  const act = (userId: string, action: string) =>
-    start(async () => {
-      setBusyId(userId);
-      try {
-        const res = await fetch("/api/admin/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, action }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Erreur");
-        router.refresh();
-      } catch (e) {
-        flash(e instanceof Error ? e.message : "Erreur", false);
-      } finally {
-        setBusyId(null);
-      }
-    });
-
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <CardTitle className="text-base">👥 Utilisateurs ({users.length})</CardTitle>
-        {msg && !msg.ok && (
-          <p className="mt-2 text-sm text-red-400">{msg.text}</p>
-        )}
-        <div className="mt-3 flex flex-col gap-2">
-          {users.map((u) => {
-            const isSelf = u.id === currentUserId;
-            const busy = pending && busyId === u.id;
+          {pools.map((pool) => {
+            const pendingColor = poolColorEdits[pool.id] ?? pool.color;
+            const colorDirty = pendingColor !== pool.color;
             return (
-              <div
-                key={u.id}
-                className="flex items-center gap-2 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] p-2.5"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate text-sm font-medium">{u.name}</span>
-                    {u.role === "ADMIN" && (
-                      <span className="rounded bg-[var(--color-gold)]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[var(--color-gold)]">
-                        Admin
+            <Card key={pool.id} className="overflow-hidden">
+              {/* Bandeau coloré */}
+              <div className="h-1 w-full transition-colors" style={{ background: pendingColor }} />
+              <div className="p-3">
+                <div className="flex items-center justify-between mb-2 gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <input
+                      type="color"
+                      value={pendingColor}
+                      onChange={(e) => setPoolColorEdits((prev) => ({ ...prev, [pool.id]: e.target.value }))}
+                      className="size-6 cursor-pointer rounded border border-[var(--color-border-subtle)] p-0 bg-transparent shrink-0"
+                      title="Couleur de la poule"
+                    />
+                    <h3 className="text-sm font-semibold truncate">
+                      {pool.name}
+                      <span className="ml-1 text-[10px] font-normal text-[var(--color-muted)]">
+                        ({pool.teams.length} équipe{pool.teams.length > 1 ? "s" : ""})
                       </span>
-                    )}
-                    {u.banned && (
-                      <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-red-400">
-                        Banni
-                      </span>
+                    </h3>
+                    {colorDirty && (
+                      <button
+                        onClick={() => handleUpdatePoolColor(pool.id, pendingColor)}
+                        className="shrink-0 rounded-full bg-[var(--color-accent)] px-2 py-0.5 text-[9px] font-bold text-black hover:brightness-110"
+                      >
+                        Sauvegarder
+                      </button>
                     )}
                   </div>
-                  <p className="truncate text-xs text-[var(--color-muted)]">
-                    {u.points} pts · {u.predictions} pronos
-                  </p>
+                  <button onClick={() => handleDeletePool(pool.id)} className="shrink-0 text-red-400 hover:text-red-300">
+                    <Trash2 className="size-4" />
+                  </button>
                 </div>
-
-                {busy ? (
-                  <Loader2 className="size-4 animate-spin text-[var(--color-muted)]" />
-                ) : (
-                  !isSelf && (
-                    <div className="flex shrink-0 gap-1">
-                      {/* Ban / unban */}
-                      {u.banned ? (
-                        <button
-                          onClick={() => act(u.id, "unban")}
-                          title="Débannir"
-                          className="flex size-8 items-center justify-center rounded-lg text-[var(--color-pitch-bright)] hover:bg-[var(--color-surface-3)]"
-                        >
-                          <Undo2 className="size-4" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => act(u.id, "ban")}
-                          title="Bannir"
-                          className="flex size-8 items-center justify-center rounded-lg text-red-400 hover:bg-[var(--color-surface-3)]"
-                        >
-                          <Ban className="size-4" />
-                        </button>
-                      )}
-                      {/* Promote / demote */}
-                      {u.role === "ADMIN" ? (
-                        <button
-                          onClick={() => act(u.id, "demote")}
-                          title="Retirer admin"
-                          className="flex size-8 items-center justify-center rounded-lg text-[var(--color-muted)] hover:bg-[var(--color-surface-3)]"
-                        >
-                          <ShieldOff className="size-4" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => act(u.id, "promote")}
-                          title="Passer admin"
-                          className="flex size-8 items-center justify-center rounded-lg text-[var(--color-gold)] hover:bg-[var(--color-surface-3)]"
-                        >
-                          <ShieldCheck className="size-4" />
-                        </button>
-                      )}
-                      {/* Supprimer */}
-                      <button
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `Supprimer définitivement ${u.name} ? (pronos, points, messages… seront effacés)`
-                            )
-                          )
-                            act(u.id, "delete");
-                        }}
-                        title="Supprimer le compte"
-                        className="flex size-8 items-center justify-center rounded-lg text-red-400 hover:bg-[var(--color-surface-3)]"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
+                <div className="space-y-1">
+                  {pool.teams.map((team) => (
+                    <div key={team.id} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        {team.logoUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={team.logoUrl} alt={team.name} className="size-5 object-contain rounded" />
+                        )}
+                        <span>{team.name}</span>
+                      </div>
+                      <button onClick={() => handleAssignTeamToPool(team.id, "")}
+                        className="text-[10px] text-red-400 hover:underline">Retirer</button>
                     </div>
-                  )
-                )}
+                  ))}
+                  {pool.teams.length === 0 && <p className="text-xs text-[var(--color-muted)]">Vide</p>}
+                </div>
               </div>
-            );
+            </Card>
+          );
           })}
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      {/* ── Matches ── */}
+      {tab === "matches" && (
+        <div className="space-y-4">
+          {/* Générer automatiquement */}
+          <Card className="p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold">Matchs de poules</h3>
+                <p className="text-[10px] text-[var(--color-muted)] mt-0.5">
+                  Génère tous les matchs aller (round-robin) de chaque poule. Assigne les poules aux équipes d&apos;abord.
+                </p>
+              </div>
+              <Button onClick={handleGeneratePoolMatches} className="text-xs shrink-0">
+                <RefreshCw className="size-3.5 mr-1" /> Générer
+              </Button>
+            </div>
+          </Card>
+
+          {/* Matchs de poules sans date → admin met la date */}
+          {poolMatches.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)] mb-2">
+                Poules ({poolMatches.length})
+              </h3>
+              <div className="space-y-1">
+                {poolMatches.map((match) => (
+                  <Card key={match.id} className="p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium truncate">{match.label}</p>
+                        <p className="text-[10px] text-[var(--color-muted)]">
+                          {match.teamA.name} vs {match.teamB.name}
+                        </p>
+                        {match.scheduledAt ? (
+                          <p className="text-[10px] text-green-400">{formatDate(match.scheduledAt)}</p>
+                        ) : (
+                          <p className="text-[10px] text-orange-400">Pas encore programmé</p>
+                        )}
+                        {match.status === "FINISHED" && (
+                          <p className="text-[10px] text-[var(--color-muted)]">
+                            Terminé : {match.scoreA} - {match.scoreB}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        {match.status !== "FINISHED" && (
+                          <button
+                            onClick={() => {
+                              setEditDateMatchId(match.id);
+                              setEditDateValue(match.scheduledAt
+                                ? new Date(match.scheduledAt).toISOString().slice(0, 16)
+                                : "");
+                            }}
+                            className="text-[10px] px-2 py-1 rounded bg-[var(--color-surface-2)] text-[var(--color-muted)] hover:text-[var(--color-cream)]"
+                          >
+                            <Calendar className="size-3.5" />
+                          </button>
+                        )}
+                        <button onClick={() => handleDeleteMatch(match.id)} className="text-red-400 hover:text-red-300">
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    {editDateMatchId === match.id && (
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="datetime-local"
+                          value={editDateValue}
+                          onChange={(e) => setEditDateValue(e.target.value)}
+                          className="flex-1 rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2 py-1 text-xs"
+                        />
+                        <button onClick={() => handleSaveMatchDate(match.id)}
+                          className="text-[10px] px-2 py-1 rounded bg-[var(--color-accent)]/10 text-[var(--color-accent)]">OK</button>
+                        <button onClick={() => setEditDateMatchId(null)}
+                          className="text-[10px] px-2 py-1 rounded text-[var(--color-muted)]">×</button>
+                      </div>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Créer un match (bracket / finale) */}
+          <Card className="p-3 space-y-2">
+            <h3 className="text-sm font-semibold">Créer un match (bracket / finale)</h3>
+            <input placeholder="Label (ex: Quart 1)" value={matchLabel} onChange={(e) => setMatchLabel(e.target.value)}
+              className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" />
+            <select value={matchPhase} onChange={(e) => setMatchPhase(e.target.value)}
+              className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-sm">
+              {PHASES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-[var(--color-muted)]">Équipe A</label>
+                <select value={matchTeamAId} onChange={(e) => setMatchTeamAId(e.target.value)}
+                  className="w-full rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2 py-1 text-xs">
+                  <option value="">—</option>
+                  {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                <select value={matchTeamASource} onChange={(e) => setMatchTeamASource(e.target.value)}
+                  className="mt-1 w-full rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2 py-1 text-[10px]">
+                  {SOURCES.map((s) => <option key={s.value} value={s.value}>Source : {s.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-[var(--color-muted)]">Équipe B</label>
+                <select value={matchTeamBId} onChange={(e) => setMatchTeamBId(e.target.value)}
+                  className="w-full rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2 py-1 text-xs">
+                  <option value="">—</option>
+                  {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                <select value={matchTeamBSource} onChange={(e) => setMatchTeamBSource(e.target.value)}
+                  className="mt-1 w-full rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2 py-1 text-[10px]">
+                  {SOURCES.map((s) => <option key={s.value} value={s.value}>Source : {s.label}</option>)}
+                </select>
+              </div>
+            </div>
+            <input type="datetime-local" value={matchScheduledAt} onChange={(e) => setMatchScheduledAt(e.target.value)}
+              className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" />
+            <Button onClick={handleCreateMatch} className="w-full text-xs">
+              <Plus className="size-3.5 mr-1" /> Créer le match
+            </Button>
+          </Card>
+
+          {/* Bracket matches */}
+          {bracketMatches.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)] mb-2">
+                Bracket / Finale ({bracketMatches.length})
+              </h3>
+              <div className="space-y-1">
+                {bracketMatches.map((match) => (
+                  <Card key={match.id} className="flex items-center justify-between p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium truncate">
+                        {match.label} · <span className="text-[var(--color-muted)]">{match.phase}</span>
+                      </p>
+                      <p className="text-[10px] text-[var(--color-muted)]">
+                        {match.teamA.name} vs {match.teamB.name}
+                      </p>
+                      {match.status === "FINISHED" && (
+                        <p className="text-[10px] text-green-400">{match.scoreA} - {match.scoreB}</p>
+                      )}
+                      {match.scheduledAt && (
+                        <p className="text-[10px] text-[var(--color-muted)]">{formatDate(match.scheduledAt)}</p>
+                      )}
+                    </div>
+                    <button onClick={() => handleDeleteMatch(match.id)} className="text-red-400 hover:text-red-300 shrink-0">
+                      <Trash2 className="size-4" />
+                    </button>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Results ── */}
+      {tab === "results" && (
+        <div className="space-y-4">
+          <Card className="p-3 space-y-2">
+            <h3 className="text-sm font-semibold">Saisir un résultat</h3>
+            <select
+              value={resultMatchId}
+              onChange={(e) => {
+                const newId = e.target.value;
+                setResultMatchId(newId);
+                const newMatch = pendingMatches.find((m) => m.id === newId);
+                if (newMatch && newMatch.phase !== "POOL" && resultWinner === "DRAW") {
+                  setResultWinner("TEAM_A");
+                }
+              }}
+              className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-sm">
+              <option value="">-- Choisir un match --</option>
+              {pendingMatches.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label || "Match"} — {m.teamA.name} vs {m.teamB.name}
+                </option>
+              ))}
+            </select>
+
+            {resultMatchId && (() => {
+              const m = pendingMatches.find((x) => x.id === resultMatchId);
+              return m ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium flex-1 text-center">{m.teamA.name}</span>
+                    <input type="number" min={0} value={resultScoreA} onChange={(e) => setResultScoreA(Number(e.target.value))}
+                      className="w-14 rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2 py-1 text-center text-sm" />
+                    <span className="text-sm text-[var(--color-muted)]">-</span>
+                    <input type="number" min={0} value={resultScoreB} onChange={(e) => setResultScoreB(Number(e.target.value))}
+                      className="w-14 rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2 py-1 text-center text-sm" />
+                    <span className="text-xs font-medium flex-1 text-center">{m.teamB.name}</span>
+                  </div>
+                  <div className={`flex gap-2`}>
+                    {resultChoices.map((r) => (
+                      <button key={r} onClick={() => setResultWinner(r)}
+                        className={cn(
+                          "flex-1 rounded-lg border px-2 py-1.5 text-xs transition-colors",
+                          resultWinner === r
+                            ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
+                            : "border-[var(--color-border-subtle)] text-[var(--color-muted)]"
+                        )}>
+                        {r === "TEAM_A" ? `✓ ${m.teamA.name}` : r === "TEAM_B" ? `✓ ${m.teamB.name}` : "Égalité"}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : null;
+            })()}
+
+            <Button onClick={handleSubmitResult} disabled={!resultMatchId} className="w-full text-xs">
+              <CheckCircle2 className="size-3.5 mr-1" /> Enregistrer + Régler les paris
+            </Button>
+          </Card>
+
+          {/* Résultats déjà saisis */}
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)] mb-2">
+              Matchs terminés
+            </h3>
+            <div className="space-y-1">
+              {matches.filter((m) => m.status === "FINISHED").map((m) => (
+                <Card key={m.id} className="p-2 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[var(--color-muted)]">{m.label}</span>
+                    <span className="font-bold">{m.scoreA} - {m.scoreB}</span>
+                  </div>
+                  <p className="text-[10px] text-[var(--color-muted)]">{m.teamA.name} vs {m.teamB.name}</p>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Users ── */}
+      {tab === "users" && (
+        <div className="space-y-4">
+          {/* Créer un joueur */}
+          <Card className="p-3 space-y-2">
+            <h3 className="text-sm font-semibold">Créer un joueur</h3>
+            <input placeholder="Nom affiché *" value={newUserName} onChange={(e) => setNewUserName(e.target.value)}
+              className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" />
+            <input placeholder="Email *" type="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)}
+              className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" />
+            <input placeholder="Mot de passe (min 6 car.) *" type="password" value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)}
+              className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-sm" />
+            <select value={newUserRole} onChange={(e) => setNewUserRole(e.target.value as "USER" | "ADMIN")}
+              className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-sm">
+              <option value="USER">Joueur</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+            <Button onClick={handleCreateUser} className="w-full text-xs">
+              <Plus className="size-3.5 mr-1" /> Créer le compte
+            </Button>
+          </Card>
+
+          {/* Liste joueurs */}
+          <div className="space-y-1">
+            {users.map((user) => (
+              <Card key={user.id} className="flex items-center justify-between p-3">
+                <div>
+                  <p className="text-sm font-medium">
+                    {user.name || "Anonyme"}
+                    {user.role === "ADMIN" && (
+                      <span className="ml-1 text-[10px] text-[var(--color-accent)]">ADMIN</span>
+                    )}
+                    {user.banned && (
+                      <span className="ml-1 text-[10px] text-red-400">banni</span>
+                    )}
+                  </p>
+                  <p className="text-[10px] text-[var(--color-muted)]">
+                    {user.email} · {user.wizzBalance} Wizz · {user.jokersLeft} jokers
+                  </p>
+                </div>
+                {user.id !== currentUserId && (
+                  <button
+                    onClick={() => handleToggleBan(user.id, user.banned)}
+                    className={cn(
+                      "text-xs px-2 py-1 rounded",
+                      user.banned ? "bg-green-400/10 text-green-400" : "bg-red-400/10 text-red-400"
+                    )}
+                  >
+                    {user.banned ? "Débannir" : "Bannir"}
+                  </button>
+                )}
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

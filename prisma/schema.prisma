@@ -1,5 +1,5 @@
-// DaronsFC — schéma Prisma
-// Doc: https://pris.ly/d/prisma-schema
+// TBT Bet — schéma Prisma
+// Tournoi Babyfoot Withings
 
 generator client {
   provider = "prisma-client-js"
@@ -13,160 +13,185 @@ datasource db {
 }
 
 // ─────────────────────────────────────────────
-// Domaine métier
+// Utilisateurs & Auth
 // ─────────────────────────────────────────────
 
 model User {
-  id            String       @id @default(cuid())
+  id            String    @id @default(cuid())
   name          String?
-  email         String       @unique
+  email         String    @unique
   emailVerified DateTime?
-  image         String? // requis par l'adapter NextAuth (avatar OAuth)
-  avatarUrl     String? // avatar affiché dans l'app (alias métier)
-  passwordHash  String? // auth email/password (null pour comptes OAuth seuls)
-  googleId      String?      @unique
-  role          Role         @default(USER)
-  banned        Boolean      @default(false)
-  createdAt     DateTime     @default(now())
-  lastSeenAt    DateTime? // présence : dernier heartbeat (compte « en ligne »)
+  image         String?   // avatar OAuth (NextAuth)
+  avatarUrl     String?   // avatar affiché dans l'app
+  passwordHash  String?   // auth email/password
+  googleId      String?   @unique
+  role          Role      @default(USER)
+  banned        Boolean   @default(false)
+  wizzBalance   Int       @default(100)
+  jokersLeft    Int       @default(2)
+  createdAt     DateTime  @default(now())
+  lastSeenAt    DateTime?
 
-  predictions   Prediction[]
+  hasSeenWelcome Boolean   @default(false)
+
+  bets          Bet[]
+  championBet   ChampionBet?
   messages      Message[]
   reactions     Reaction[]
-  badges        UserBadge[]
   pushSubs      PushSubscription[]
-  score         Score?
-  championPick  ChampionPick?
-  groupMemberships GroupMember[]
 
   accounts      Account[]
   sessions      Session[]
 }
 
 // ─────────────────────────────────────────────
-// Groupes d'amis
+// Équipes & Poules
 // ─────────────────────────────────────────────
 
-model Group {
-  id        String        @id @default(cuid())
-  name      String
-  token     String        @unique // lien d'invitation unique et stable
-  createdBy String
-  createdAt DateTime      @default(now())
-  members   GroupMember[]
-  messages  Message[]
+model Team {
+  id         String   @id @default(cuid())
+  name       String
+  player1    String?
+  player2    String?
+  logoUrl    String?
+  poolId     String?
+  pool       Pool?    @relation(fields: [poolId], references: [id])
+  eliminated Boolean  @default(false)
+  losses     Int      @default(0)
+  wins       Int      @default(0)
+
+  matchesAsTeamA Match[]       @relation("TeamA")
+  matchesAsTeamB Match[]       @relation("TeamB")
+  championBets   ChampionBet[]
 }
 
-model GroupMember {
-  groupId  String
-  userId   String
-  role     GroupRole @default(MEMBER)
-  joinedAt DateTime  @default(now())
-  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+model Pool {
+  id    String @id @default(cuid())
+  name  String           // "Poule A", "Poule B"...
+  color String @default("#F5C400")
+  teams Team[]
+}
 
-  @@id([groupId, userId])
-  @@index([userId])
+// ─────────────────────────────────────────────
+// Matchs & Finale BO3
+// ─────────────────────────────────────────────
+
+enum BracketSource {
+  POOL
+  WINNER_BRACKET
+  LOSER_BRACKET
+}
+
+enum MatchPhase {
+  POOL
+  WINNER_BRACKET
+  LOSER_BRACKET
+  FINAL_SERIES
+}
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  CANCELLED
+}
+
+enum MatchResult {
+  TEAM_A
+  TEAM_B
+  DRAW
 }
 
 model Match {
-  id          String       @id @default(cuid())
-  homeTeam    String
-  awayTeam    String
-  homeFlag    String
-  awayFlag    String
-  kickoffAt   DateTime
-  stage       Stage
-  group       String?
-  matchday    Int? // numéro de journée (pour le joker / filtres)
-  externalId  Int? // id API-Football
-  // Cotes 1X2 figées (The Odds API) — servent au scoring « façon MPP » : plus
-  // l'issue est improbable, plus le bon résultat rapporte. Capturées ~toutes
-  // les 6 h jusqu'au coup d'envoi, puis figées (closing odds).
-  oddsHome       Float?
-  oddsDraw       Float?
-  oddsAway       Float?
-  oddsCapturedAt DateTime?
-  predictions Prediction[]
-  result      Result?
+  id              String        @id @default(cuid())
+  label           String        // libre, ex: "Quart 1", "Match 12"
+  phase           MatchPhase
+  round           Int?
+  teamAId         String
+  teamA           Team          @relation("TeamA", fields: [teamAId], references: [id])
+  teamASource     BracketSource // d'où vient teamA POUR CE MATCH (détermine sa cote)
+  teamBId         String
+  teamB           Team          @relation("TeamB", fields: [teamBId], references: [id])
+  teamBSource     BracketSource
+  scheduledAt     DateTime?
+  bettingClosesAt DateTime?
+  status          MatchStatus   @default(SCHEDULED)
+  result          MatchResult?
+  scoreA          Int?
+  scoreB          Int?
+  finalSeriesId   String?       // null sauf si ce match fait partie du BO3 final
+  finalSeries     FinalSeries?  @relation(fields: [finalSeriesId], references: [id])
+  createdAt       DateTime      @default(now())
 
-  @@index([kickoffAt])
+  bets            Bet[]
+
+  @@index([status])
+  @@index([scheduledAt])
 }
 
-model Prediction {
-  id          String   @id @default(cuid())
-  userId      String
-  matchId     String
-  homeScore   Int
-  awayScore   Int
-  joker       Boolean  @default(false)
-  comment     String? // visible uniquement après coup d'envoi (anti-influence)
-  pointsAwarded Int?   // null tant que le match n'est pas terminé
-  submittedAt DateTime @default(now())
+// Série finale en BO3 : regroupe 2 ou 3 matchs liés
+model FinalSeries {
+  id           String  @id @default(cuid())
+  teamAId      String
+  teamBId      String
+  teamAWins    Int     @default(0)
+  teamBWins    Int     @default(0)
+  winnerTeamId String?
+  matches      Match[]
+}
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  match       Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+// ─────────────────────────────────────────────
+// Paris
+// ─────────────────────────────────────────────
+
+model Bet {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matchId     String
+  match       Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  choice      MatchResult
+  amountWizz  Int
+  oddsApplied Float       // snapshot de la cote au moment du pari (x2 / x1.5 / x3)
+  jokerUsed   Boolean     @default(false)
+  settled     Boolean     @default(false)
+  payout      Int?
+  createdAt   DateTime    @default(now())
 
   @@unique([userId, matchId])
   @@index([matchId])
 }
 
-model Result {
-  matchId   String     @id
-  homeScore Int
-  awayScore Int
-  status    MatchStatus @default(SCHEDULED)
-  notified  Boolean    @default(false) // notif push résultat déjà envoyée ?
-  updatedAt DateTime   @default(now()) @updatedAt
-  match     Match      @relation(fields: [matchId], references: [id], onDelete: Cascade)
+model ChampionBet {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId     String
+  team       Team     @relation(fields: [teamId], references: [id])
+  amountWizz Int
+  jokerUsed  Boolean  @default(false)
+  settled    Boolean  @default(false)
+  payout     Int?
+  createdAt  DateTime @default(now())
 }
 
-model Score {
-  userId         String @id
-  points         Int    @default(0)
-  exactScores    Int    @default(0)
-  correctResults Int    @default(0)
-  previousRank   Int? // rang avant le dernier match terminé (pour l'évolution ▲▼)
-  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-// Pari « vainqueur du tournoi » : un seul choix par joueur, définitif, qui
-// rapporte un bonus (CHAMPION_BONUS) si l'équipe choisie gagne la finale.
-model ChampionPick {
-  userId    String   @id
-  team      String // nom de l'équipe (affichage)
-  flag      String // code drapeau (fr, br, …)
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-// Vainqueur du tournoi désigné MANUELLEMENT par un admin — pour le cas d'une
-// finale gagnée aux tirs au but (score nul, vainqueur indéductible du score
-// fourni par l'API). Singleton (id = "singleton"). Prioritaire sur le score.
-model ChampionOverride {
-  id    String   @id @default("singleton")
-  team  String
-  flag  String
-  setAt DateTime @default(now()) @updatedAt
-}
+// ─────────────────────────────────────────────
+// Chat global
+// ─────────────────────────────────────────────
 
 model Message {
   id        String     @id @default(cuid())
   userId    String
-  groupId   String? // tchat propre à un groupe (null = ancien tchat global)
   content   String
   pinned    Boolean    @default(false)
-  isSystem  Boolean    @default(false) // message auto → rendu en bandeau
-  systemKind String? // "RECAP" — distingue les messages auto
-  matchId   String? // message rattaché à un match → idempotence (1 / match / groupe / kind)
+  isSystem  Boolean    @default(false)
+  systemKind String?   // "RECAP" — distingue les messages auto
+  matchId   String?    // message rattaché à un match → idempotence
   createdAt DateTime   @default(now())
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  group     Group?     @relation(fields: [groupId], references: [id], onDelete: Cascade)
   reactions Reaction[]
 
   @@index([createdAt])
-  @@index([groupId, createdAt])
-  @@index([groupId, matchId])
 }
 
 model Reaction {
@@ -180,33 +205,9 @@ model Reaction {
   @@unique([messageId, userId, emoji])
 }
 
-model Badge {
-  id          String      @id @default(cuid())
-  key         String      @unique // "nostradamus" | "daronissime" | "meme_pas_mal" | "sniper"
-  label       String
-  emoji       String
-  description String
-  users       UserBadge[]
-}
-
-model UserBadge {
-  userId    String
-  badgeId   String
-  awardedAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
-
-  @@id([userId, badgeId])
-}
-
-model Invite {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  createdBy String
-  expiresAt DateTime?
-  usesLeft  Int? // null = illimité
-  createdAt DateTime @default(now())
-}
+// ─────────────────────────────────────────────
+// Notifications Push
+// ─────────────────────────────────────────────
 
 model PushSubscription {
   id        String   @id @default(cuid())
@@ -263,25 +264,4 @@ model VerificationToken {
 enum Role {
   USER
   ADMIN
-}
-
-enum GroupRole {
-  OWNER
-  MEMBER
-}
-
-enum Stage {
-  GROUP
-  ROUND_OF_32
-  ROUND_OF_16
-  QUARTER
-  SEMI
-  THIRD_PLACE
-  FINAL
-}
-
-enum MatchStatus {
-  SCHEDULED
-  LIVE
-  FINISHED
 }

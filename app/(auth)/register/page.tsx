@@ -12,10 +12,7 @@ export default async function RegisterPage() {
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4 py-8">
       {/* ── Animated background ────────────────────── */}
       <div className="pointer-events-none absolute inset-0">
-        {/* Base dark */}
         <div className="absolute inset-0 bg-[var(--color-bg)]" />
-
-        {/* Gold gradient orb – top left */}
         <div
           className="absolute -left-32 -top-32 h-[500px] w-[500px] rounded-full opacity-[0.06] blur-[120px]"
           style={{
@@ -23,17 +20,13 @@ export default async function RegisterPage() {
               "radial-gradient(circle, var(--color-gold) 0%, transparent 70%)",
           }}
         />
-
-        {/* Pitch gradient orb – bottom right */}
         <div
           className="absolute -bottom-32 -right-32 h-[400px] w-[400px] rounded-full opacity-[0.06] blur-[100px]"
           style={{
             background:
-              "radial-gradient(circle, var(--color-pitch) 0%, transparent 70%)",
+              "radial-gradient(circle, var(--color-accent) 0%, transparent 70%)",
           }}
         />
-
-        {/* Subtle grid pattern */}
         <div
           className="absolute inset-0 opacity-[0.015]"
           style={{
@@ -46,9 +39,7 @@ export default async function RegisterPage() {
 
       {/* ── Card ───────────────────────────────────── */}
       <div className="animate-stagger stagger-1 relative z-10 flex w-full max-w-md flex-col">
-        {/* Glass card */}
         <div className="glass-strong rounded-3xl p-8 shadow-2xl shadow-black/40">
-          {/* Back link */}
           <Link
             href="/login"
             className="mb-6 inline-flex items-center gap-1.5 text-sm text-[var(--color-muted)] transition-colors duration-200 hover:text-[var(--color-cream)]"
@@ -66,20 +57,18 @@ export default async function RegisterPage() {
                 d="M15.75 19.5 8.25 12l7.5-7.5"
               />
             </svg>
-            Retour a la connexion
+            Retour à la connexion
           </Link>
 
-          {/* Header */}
           <div className="mb-8">
-            {/* Logo */}
             <div className="mb-5">
               <Image
                 src="/logo.png"
-                alt="DaronsFC"
+                alt="TBT Bet"
                 width={80}
                 height={80}
                 priority
-                className="rounded-2xl shadow-lg shadow-[var(--color-gold)]/20 ring-1 ring-white/10"
+                className="rounded-2xl shadow-lg shadow-[var(--color-accent)]/20 ring-1 ring-white/10"
               />
             </div>
 
@@ -87,7 +76,7 @@ export default async function RegisterPage() {
               Inscription
             </h1>
             <p className="mt-1.5 text-sm text-[var(--color-muted)]">
-              Cree ton compte et commence a prono.
+              Crée ton compte et commence à parier.
             </p>
           </div>
 
@@ -106,20 +95,18 @@ export default async function RegisterPage() {
 
           {/* Login link */}
           <p className="mt-6 text-center text-sm text-[var(--color-muted)]">
-            Deja un compte ?{" "}
+            Déjà un compte ?{" "}
             <Link
               href="/login"
-              className="font-medium text-[var(--color-pitch-bright)] transition-colors duration-200 hover:text-[var(--color-pitch)] hover:underline"
+              className="font-medium text-[var(--color-accent-bright)] transition-colors duration-200 hover:text-[var(--color-accent)] hover:underline"
             >
               Connecte-toi
             </Link>
           </p>
         </div>
 
-        {/* Terms hint */}
         <p className="mt-4 text-center text-xs text-[var(--color-muted)]/60">
-          En creant un compte, tu acceptes les regles de la Darons League FC
-          (bon ok… j&apos;avoue y&apos;en a pas).
+          En créant un compte, tu obtiens 100 Wizz et 2 Jokers pour parier.
         </p>
       </div>
     </main>

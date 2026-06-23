@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <defs>
+    <clipPath id="clip"><rect width="32" height="32" rx="6" ry="6"/></clipPath>
+  </defs>
+
+  <!-- Fond noir -->
+  <rect width="32" height="32" rx="6" ry="6" fill="#111111"/>
+
+  <!-- Bande jaune basse -->
+  <rect x="0" y="28" width="32" height="4" fill="#F5C400" clip-path="url(#clip)"/>
+
+  <!-- Barre de babyfoot (tige blanche) -->
+  <rect x="0" y="13" width="32" height="1" rx="1" fill="#FFFFFF" opacity="0.92" clip-path="url(#clip)"/>
+
+  <!-- Corps du joueur (jaune) -->
+  <rect x="13.5" y="9" width="5" height="8" rx="1" fill="#F5C400"/>
+
+  <!-- Tête (blanche) -->
+  <circle cx="16" cy="8" r="2" fill="#FFFFFF"/>
+  <!-- Traits du visage (minimaliste) -->
+  <circle cx="15" cy="8" r="0" fill="#111111"/>
+  <circle cx="17" cy="8" r="0" fill="#111111"/>
+
+  <!-- Jambe en coup (jaune, rotée) -->
+  <line x1="17" y1="17" x2="20" y2="20"
+        stroke="#F5C400" stroke-width="1" stroke-linecap="round"/>
+
+  <!-- Ballon de foot (cercle + lignes pentagonales simplifiées) -->
+  <circle cx="12" cy="19" r="2" fill="#FFFFFF" opacity="0.95"/>
+  <circle cx="12" cy="19" r="1" fill="#111111" opacity="0.7"/>
+  <line x1="12" y1="17" x2="12" y2="21"
+        stroke="#111111" stroke-width="0" opacity="0.4"/>
+  <line x1="10" y1="19" x2="14" y2="19"
+        stroke="#111111" stroke-width="0" opacity="0.4"/>
+
+  <!-- "TBT" -->
+  <text x="18" y="28"
+    font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="6"
+    fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" letter-spacing="-2">TBT</text>
+
+  <!-- "BET" en jaune (en dessous, dans la bande jaune) -->
+  <text x="18" y="30"
+    font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="3"
+    fill="#111111" text-anchor="middle" dominant-baseline="middle" letter-spacing="4">BET</text>
+</svg>

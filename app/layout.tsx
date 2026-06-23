@@ -16,13 +16,16 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DaronsFC — Pronos entre potes",
+  title: "TBT Bet — Tournoi Babyfoot Withings",
   description:
-    "Prouve à tes potes que t'as pas regardé les matchs pour rien. Pronostics de la Coupe du Monde entre amis.",
+    "Pronostics du tournoi de babyfoot interne Withings. Parie, grimpe au classement, deviens le champion des pronostiqueurs.",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "DaronsFC" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "TBT Bet" },
   icons: {
     icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
       { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
     ],

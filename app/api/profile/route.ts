@@ -1,45 +1,27 @@
-import { NextResponse } from "next/server";
-import { z } from "zod";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { reassignOwnedGroups } from "@/lib/groups";
+import { z } from "zod";
 
-const schema = z.object({ name: z.string().trim().min(2).max(30) });
+const schema = z.object({
+  name: z.string().min(1).max(50).optional(),
+  avatarUrl: z.string().url().nullable().optional(),
+});
 
-/**
- * Met à jour le pseudo de l'utilisateur connecté.
- *
- *   PATCH /api/profile  { name }
- */
-export async function PATCH(req: Request) {
+export async function PATCH(req: NextRequest) {
   const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Non connecté" }, { status: 401 });
-  }
-  const parsed = schema.safeParse(await req.json().catch(() => null));
+  if (!session?.user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+
+  const body = await req.json();
+  const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Pseudo invalide (2 à 30 caractères)." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Données invalides", details: parsed.error.flatten() }, { status: 400 });
   }
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: { name: parsed.data.name },
-  });
-  return NextResponse.json({ ok: true, name: parsed.data.name });
-}
 
-/** Suppression définitive du compte de l'utilisateur connecté. */
-export async function DELETE() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Non connecté" }, { status: 401 });
-  }
-  // Transmet la propriété de ses groupes avant la cascade (sinon le groupe
-  // resterait sans organisateur).
-  await reassignOwnedGroups(session.user.id).catch(() => {});
-  // Cascade : pronos, score, messages, badges, abonnements… (schéma Prisma).
-  await prisma.user.delete({ where: { id: session.user.id } });
-  return NextResponse.json({ ok: true });
+  const data: Record<string, unknown> = {};
+  if (parsed.data.name !== undefined) data.name = parsed.data.name;
+  if (parsed.data.avatarUrl !== undefined) data.avatarUrl = parsed.data.avatarUrl;
+
+  await prisma.user.update({ where: { id: session.user.id }, data });
+  return NextResponse.json({ success: true });
 }

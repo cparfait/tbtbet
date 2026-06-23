@@ -9,22 +9,22 @@ export default async function LandingPage() {
 
   const features = [
     {
-      icon: "\u{1F3AF}",
-      title: "Pronostique chaque match de la CdM",
+      icon: "\u{1F3B2}",
+      title: "Parie sur chaque match",
       description:
-        "Score exact, vainqueur, nombre de buts\u2014choisis ta méthode.",
+        "Victoire A, Victoire B ou \u00c9galit\u00e9\u2014place tes Wizz et grimpe au classement.",
     },
     {
       icon: "\u{1F0CF}",
       title: "Joue ton Joker \u00D72 strat\u00e9gique",
       description:
-        "Double tes points : 4 jokers en poules, 2 en phase finale.",
+        "Double tes gains : 2 jokers \u00e0 utiliser quand tu es s\u00fbr de toi.",
     },
     {
       icon: "\u{1F3C6}",
-      title: "Domine le classement de ta bande",
+      title: "Domine le classement",
       description:
-        "Classement en temps réel. Qui est le vrai patron\u00a0?",
+        "Qui sera le meilleur pronostiqueur du tournoi\u00a0?",
     },
   ];
 
@@ -36,9 +36,9 @@ export default async function LandingPage() {
         className="pointer-events-none absolute inset-0 z-0"
         style={{
           background: [
-            "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(22,163,74,0.18) 0%, transparent 60%)",
-            "radial-gradient(ellipse 60% 40% at 20% 80%, rgba(22,163,74,0.08) 0%, transparent 50%)",
-            "radial-gradient(ellipse 50% 50% at 80% 60%, rgba(245,158,11,0.06) 0%, transparent 50%)",
+            "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(234,179,8,0.15) 0%, transparent 60%)",
+            "radial-gradient(ellipse 60% 40% at 20% 80%, rgba(234,179,8,0.06) 0%, transparent 50%)",
+            "radial-gradient(ellipse 50% 50% at 80% 60%, rgba(234,179,8,0.04) 0%, transparent 50%)",
             "var(--color-bg)",
           ].join(","),
         }}
@@ -64,31 +64,31 @@ export default async function LandingPage() {
         </div>
       </div>
 
-      {/* ── Decorative pitch line at top ── */}
+      {/* ── Decorative line at top ── */}
       <div
         aria-hidden="true"
         className="absolute left-0 right-0 top-0 z-10 h-px"
         style={{
           background:
-            "linear-gradient(90deg, transparent 0%, var(--color-pitch) 30%, var(--color-pitch-bright) 50%, var(--color-pitch) 70%, transparent 100%)",
+            "linear-gradient(90deg, transparent 0%, var(--color-accent) 30%, var(--color-accent-bright) 50%, var(--color-accent) 70%, transparent 100%)",
           opacity: 0.4,
         }}
       />
 
       {/* ── Content ── */}
       <div className="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-6 pt-8 pb-6 text-center">
-        {/* Football icon with float */}
+        {/* Babyfoot icon with float */}
         <div className="animate-float animate-stagger stagger-1 mb-5">
           <div
             className="
               flex size-16 items-center justify-center rounded-[1.5rem]
               text-3xl
-              shadow-[0_0_40px_rgba(22,163,74,0.25)]
+              shadow-[0_0_40px_rgba(234,179,8,0.25)]
             "
             style={{
               background:
-                "linear-gradient(135deg, rgba(22,163,74,0.15), rgba(22,163,74,0.05))",
-              border: "1px solid rgba(22,163,74,0.2)",
+                "linear-gradient(135deg, rgba(234,179,8,0.15), rgba(234,179,8,0.05))",
+              border: "1px solid rgba(234,179,8,0.2)",
             }}
           >
             {"\u26BD"}
@@ -104,8 +104,8 @@ export default async function LandingPage() {
             sm:text-6xl
           "
         >
-          Darons
-          <span className="text-gradient-gold">FC</span>
+          TBT
+          <span className="text-gradient-gold">Bet</span>
         </h1>
 
         {/* Tagline */}
@@ -116,8 +116,8 @@ export default async function LandingPage() {
             text-[var(--color-muted)]
           "
         >
-          Prouve &agrave; tes potes que t&apos;as pas regard&eacute; les matchs
-          pour rien.
+          Tournoi de babyfoot Withings. Parie, trash-talk, deviens le champion
+          des pronostiqueurs.
         </p>
 
         {/* Divider */}
@@ -126,7 +126,7 @@ export default async function LandingPage() {
           className="animate-stagger stagger-3 my-5 h-px w-16"
           style={{
             background:
-              "linear-gradient(90deg, transparent, var(--color-pitch), transparent)",
+              "linear-gradient(90deg, transparent, var(--color-accent), transparent)",
             opacity: 0.4,
           }}
         />
@@ -149,8 +149,8 @@ export default async function LandingPage() {
                 "
                 style={{
                   background:
-                    "linear-gradient(135deg, rgba(22,163,74,0.12), rgba(22,163,74,0.04))",
-                  border: "1px solid rgba(22,163,74,0.15)",
+                    "linear-gradient(135deg, rgba(234,179,8,0.12), rgba(234,179,8,0.04))",
+                  border: "1px solid rgba(234,179,8,0.15)",
                 }}
               >
                 {f.icon}
@@ -221,16 +221,16 @@ export default async function LandingPage() {
               "linear-gradient(90deg, transparent, var(--color-border-subtle), transparent)",
           }}
         />
-        DaronsFC &middot; Coupe du Monde 2026
+        TBT Bet &middot; Tournoi Babyfoot Withings
       </footer>
 
-      {/* ── Bottom decorative pitch line ── */}
+      {/* ── Bottom decorative line ── */}
       <div
         aria-hidden="true"
         className="absolute bottom-0 left-0 right-0 z-10 h-px"
         style={{
           background:
-            "linear-gradient(90deg, transparent 0%, var(--color-pitch) 30%, var(--color-gold) 50%, var(--color-pitch) 70%, transparent 100%)",
+            "linear-gradient(90deg, transparent 0%, var(--color-accent) 30%, var(--color-gold) 50%, var(--color-accent) 70%, transparent 100%)",
           opacity: 0.25,
         }}
       />

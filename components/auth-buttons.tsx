@@ -276,7 +276,7 @@ export function RegisterForm({
           minLength={2}
           maxLength={50}
           autoComplete="name"
-          placeholder="Ton pseudo de daron"
+          placeholder="Ton pseudo"
           className={`${inputBase} ${inputNormal}`}
         />
       </div>

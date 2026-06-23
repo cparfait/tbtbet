@@ -1,27 +1,21 @@
-// Service worker minimal DaronsFC.
-// Présence d'un handler `fetch` requise pour que Chrome/Android proposent
-// l'installation. Le contenu applicatif (API, pages) reste en passthrough
-// réseau pour ne jamais servir de données périmées (appli temps réel).
+// Service worker TBT Bet.
+// Handler `fetch` minimal pour que Chrome/Android propose l'installation PWA.
+// Le contenu applicatif reste en passthrough réseau (pas de données périmées).
 //
-// SEULE EXCEPTION : les assets immuables (drapeaux flagcdn, logos API-Football)
-// sont mis en cache (cache-first). Ils ne changent jamais, donc aucun risque de
-// périmé — et ça corrige les drapeaux manquants sur iOS quand le réseau mobile
-// avorte une requête (avant, un échec laissait un drapeau vide jusqu'à ce qu'on
-// change de menu).
+// SEULE EXCEPTION : assets immuables de logos d'équipes mis en cache (cache-first).
 
-const ASSET_CACHE = "daronsfc-assets-v1";
-const ASSET_HOSTS = ["flagcdn.com", "media.api-sports.io"];
+const ASSET_CACHE = "tbtbet-assets-v1";
+const ASSET_HOSTS = [];
 
 self.addEventListener("install", () => self.skipWaiting());
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     Promise.all([
-      // Purge des anciens caches d'assets (versions précédentes).
       caches.keys().then((keys) =>
         Promise.all(
           keys
-            .filter((k) => k.startsWith("daronsfc-assets-") && k !== ASSET_CACHE)
+            .filter((k) => k.startsWith("tbtbet-assets-") && k !== ASSET_CACHE)
             .map((k) => caches.delete(k))
         )
       ),
@@ -41,7 +35,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Assets immuables uniquement → cache-first avec repli réseau.
   if (ASSET_HOSTS.includes(url.hostname)) {
     event.respondWith(
       caches.open(ASSET_CACHE).then(async (cache) => {
@@ -49,14 +42,11 @@ self.addEventListener("fetch", (event) => {
         if (cached) return cached;
         try {
           const res = await fetch(req);
-          // On ne met en cache que les réponses exploitables.
           if (res && (res.ok || res.type === "opaque")) {
             cache.put(req, res.clone());
           }
           return res;
         } catch (err) {
-          // Hors-ligne / réseau avorté : si on a un cache (même partiel), il a
-          // déjà été renvoyé plus haut. Sinon on propage l'échec.
           throw err;
         }
       })
@@ -64,7 +54,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Tout le reste : passthrough réseau (pas de respondWith).
+  // Passthrough réseau pour tout le reste.
 });
 
 // ── Notifications push ──
@@ -73,9 +63,9 @@ self.addEventListener("push", (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: "DaronsFC", body: event.data ? event.data.text() : "" };
+    data = { title: "TBT Bet", body: event.data ? event.data.text() : "" };
   }
-  const title = data.title || "DaronsFC";
+  const title = data.title || "TBT Bet";
   event.waitUntil(
     self.registration.showNotification(title, {
       body: data.body || "",

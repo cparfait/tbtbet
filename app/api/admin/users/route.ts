@@ -1,64 +1,64 @@
-import { NextResponse } from "next/server";
-import { z } from "zod";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { reassignOwnedGroups } from "@/lib/groups";
+import { z } from "zod";
+import bcrypt from "bcryptjs";
 
-const schema = z.object({
-  userId: z.string().min(1),
-  action: z.enum(["ban", "unban", "promote", "demote", "delete"]),
+const updateSchema = z.object({
+  id: z.string().min(1),
+  banned: z.boolean().optional(),
+  role: z.enum(["USER", "ADMIN"]).optional(),
+  wizzBalance: z.number().int().optional(),
+  jokersLeft: z.number().int().min(0).optional(),
 });
 
-/**
- * Actions admin sur un utilisateur : bannir/débannir, passer admin/user,
- * supprimer. Réservé aux admins. Un admin ne peut pas se bannir, se
- * rétrograder ni se supprimer lui-même (anti-verrouillage).
- *
- *   POST /api/admin/users  { userId, action }
- */
-export async function POST(req: Request) {
+const createSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  password: z.string().min(6),
+  role: z.enum(["USER", "ADMIN"]).default("USER"),
+});
+
+function adminOnly() {
+  return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+}
+
+export async function POST(req: NextRequest) {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") {
-    return NextResponse.json({ error: "Accès réservé aux admins." }, { status: 403 });
-  }
+  if (!session?.user || session.user.role !== "ADMIN") return adminOnly();
 
-  const parsed = schema.safeParse(await req.json().catch(() => null));
+  const body = await req.json();
+  const parsed = createSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
+    return NextResponse.json({ error: "Données invalides", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { userId, action } = parsed.data;
-  if (
-    userId === session.user.id &&
-    (action === "ban" || action === "demote" || action === "delete")
-  ) {
-    return NextResponse.json(
-      { error: "Tu ne peux pas te bannir, te rétrograder ni te supprimer toi-même." },
-      { status: 400 }
-    );
+  const { name, email, password, role } = parsed.data;
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    return NextResponse.json({ error: "Un compte existe déjà avec cet email" }, { status: 409 });
   }
 
-  try {
-    if (action === "delete") {
-      // Transmet la propriété de ses groupes avant la cascade.
-      await reassignOwnedGroups(userId).catch(() => {});
-      // Cascade : prédictions, score, messages, badges, abonnements… (schéma).
-      await prisma.user.delete({ where: { id: userId } });
-      return NextResponse.json({ ok: true });
-    }
+  const passwordHash = await bcrypt.hash(password, 12);
+  const user = await prisma.user.create({
+    data: { name, email, passwordHash, role },
+  });
 
-    const data =
-      action === "ban"
-        ? { banned: true }
-        : action === "unban"
-          ? { banned: false }
-          : action === "promote"
-            ? { role: "ADMIN" as const }
-            : { role: "USER" as const };
+  return NextResponse.json({ id: user.id, name: user.name, email: user.email });
+}
 
-    await prisma.user.update({ where: { id: userId }, data });
-    return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: "Utilisateur introuvable." }, { status: 404 });
+export async function PATCH(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "ADMIN") return adminOnly();
+
+  const body = await req.json();
+  const parsed = updateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Données invalides" }, { status: 400 });
   }
+
+  const { id, ...data } = parsed.data;
+  await prisma.user.update({ where: { id }, data });
+  return NextResponse.json({ success: true });
 }

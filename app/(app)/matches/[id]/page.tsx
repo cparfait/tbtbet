@@ -1,20 +1,27 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import { ArrowLeft, Trophy, Radio, Users } from "lucide-react";
-import { CountdownTimer } from "@/components/countdown-timer";
-import { PredictionForm } from "@/components/prediction-form";
-import { MatchPredictions } from "@/components/match-predictions";
-import { LiveRefresher } from "@/components/live-refresher";
-import { Flag } from "@/components/flag";
+import { redirect, notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { getMatch, getMatchPredictions } from "@/lib/data/queries";
-import { getActiveGroup, getGroupMemberIds } from "@/lib/groups";
-import { STAGE_LABELS, type MatchPrediction } from "@/lib/data/matches";
-import { jokerPhase, stagesOfPhase, jokerBudget } from "@/lib/jokers";
-import { formatKickoff } from "@/lib/utils";
+import { Card } from "@/components/ui/card";
+import { getMatchById, getUserBetForMatch, getUserById } from "@/lib/data/queries";
+import { getOddsForTeam, getOddsForDraw } from "@/lib/odds";
+import { BetForm } from "./bet-form";
+import Link from "next/link";
+import { ArrowLeft, Lock } from "lucide-react";
 
+export const metadata = { title: "Match · TBT Bet" };
 export const dynamic = "force-dynamic";
+
+const PHASE_LABEL: Record<string, string> = {
+  POOL: "Phase de poules",
+  WINNER_BRACKET: "Winner Bracket",
+  LOSER_BRACKET: "Loser Bracket",
+  FINAL_SERIES: "Finale (BO3)",
+};
+
+const SOURCE_LABEL: Record<string, string> = {
+  POOL: "Poule",
+  WINNER_BRACKET: "Winner",
+  LOSER_BRACKET: "Loser",
+};
 
 export default async function MatchDetailPage({
   params,
@@ -22,218 +29,275 @@ export default async function MatchDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [match, session] = await Promise.all([getMatch(id), auth()]);
+  const session = await auth();
+  if (!session?.user) redirect("/login");
+
+  const [match, user, existingBet] = await Promise.all([
+    getMatchById(id),
+    getUserById(session.user.id),
+    getUserBetForMatch(session.user.id, id),
+  ]);
+
   if (!match) notFound();
 
-  // Prono existant de l'utilisateur connecté (pour pré-remplir le formulaire)
-  let existing: { homeScore: number; awayScore: number; joker: boolean; comment?: string } | undefined;
-  if (session?.user?.id) {
-    try {
-      const pred = await prisma.prediction.findUnique({
-        where: { userId_matchId: { userId: session.user.id, matchId: id } },
-        select: { homeScore: true, awayScore: true, joker: true, comment: true },
-      });
-      if (pred) {
-        existing = {
-          homeScore: pred.homeScore,
-          awayScore: pred.awayScore,
-          joker: pred.joker,
-          comment: pred.comment ?? undefined,
-        };
-      }
-    } catch {}
-  }
+  const oddsA = getOddsForTeam(match.phase, match.teamASource, match.teamBSource, match.teamA.wins);
+  const oddsB = getOddsForTeam(match.phase, match.teamBSource, match.teamASource, match.teamB.wins);
+  const oddsDraw = getOddsForDraw();
+  const allowDraw = match.phase === "POOL";
 
-  // Jokers restants pour la phase de ce match (poules = 4, phase finale = 2)
-  const budget = jokerBudget(match.stage);
-  let jokersLeft = budget;
-  if (session?.user?.id) {
-    try {
-      const usedElsewhere = await prisma.prediction.count({
-        where: {
-          userId: session.user.id,
-          joker: true,
-          matchId: { not: id },
-          match: { stage: { in: stagesOfPhase(jokerPhase(match.stage)) } },
-        },
-      });
-      jokersLeft = Math.max(0, budget - usedElsewhere);
-    } catch {}
-  }
+  const isFinished = match.status === "FINISHED";
+  const isLive = match.status === "LIVE";
+  const isClosed =
+    !isFinished &&
+    match.bettingClosesAt != null &&
+    new Date(match.bettingClosesAt) <= new Date();
+  const isOpen = !isFinished && !isClosed;
 
-  const kickoff = new Date(match.kickoffAt);
-  const locked = Date.now() >= kickoff.getTime();
-  const finished = match.result?.status === "FINISHED";
-  const live = match.live;
-  const group = match.group ? `Groupe ${match.group}` : STAGE_LABELS[match.stage];
-
-  // Après le coup d'envoi : les pronos des joueurs du groupe actif deviennent publics.
-  let predictions: MatchPrediction[] = [];
-  if (locked) {
-    let memberIds: string[] | undefined;
-    if (session?.user?.id) {
-      const activeGroup = await getActiveGroup(session.user.id);
-      if (activeGroup) {
-        memberIds = await getGroupMemberIds(activeGroup.id);
-      }
-    }
-    predictions = await getMatchPredictions(id, memberIds);
-  }
+  const betWon =
+    existingBet?.settled &&
+    existingBet.payout != null &&
+    existingBet.payout > existingBet.amountWizz;
+  const betLost =
+    existingBet?.settled &&
+    existingBet.payout != null &&
+    existingBet.payout === 0;
 
   return (
-    <>
-      {live && <LiveRefresher seconds={30} />}
-
-      {/* ── Back link ── */}
+    <div className="space-y-4">
+      {/* Retour */}
       <Link
         href="/matches"
-        className="mb-5 inline-flex items-center gap-2 rounded-full px-2 py-1 text-sm text-[var(--color-muted)] transition-colors hover:bg-[var(--color-surface)] hover:text-[var(--color-cream)]"
+        className="inline-flex items-center gap-1 text-sm text-[var(--color-muted)] hover:text-[var(--color-cream)]"
       >
-        <ArrowLeft className="size-4" />
-        <span>Tous les matchs</span>
+        <ArrowLeft className="size-4" /> Matchs
       </Link>
 
-      {/* ── Hero section with decorative glow ── */}
-      <div className="relative">
-        {/* Background glow */}
-        <div className="pointer-events-none absolute -top-16 left-1/2 -translate-x-1/2 h-72 w-[120%] rounded-full bg-[var(--color-pitch)] opacity-[0.06] blur-[80px]" />
-        <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 h-48 w-[80%] rounded-full bg-[var(--color-gold)] opacity-[0.04] blur-[60px]" />
-
-        {/* Main hero card */}
-        <div className="glass-strong relative overflow-hidden rounded-3xl p-6 sm:p-8">
-          {/* Stage / Group label */}
-          <div className="mb-6 text-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-1 font-[family-name:var(--font-mono)] text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--color-muted)]">
-              {group}
+      {/* ── Hero du match ── */}
+      <Card className="overflow-hidden">
+        {/* Bandeau phase + statut */}
+        <div className="flex items-center justify-between bg-[var(--color-surface-2)] px-4 py-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+            {PHASE_LABEL[match.phase] ?? match.phase}
+            {match.label ? ` · ${match.label}` : ""}
+          </span>
+          {isLive && (
+            <span className="flex items-center gap-1 text-[10px] font-semibold text-red-400">
+              <span className="size-1.5 rounded-full bg-red-500 animate-pulse" />
+              LIVE
             </span>
-          </div>
+          )}
+          {isFinished && (
+            <span className="text-[10px] font-semibold text-[var(--color-muted)]">
+              Terminé
+            </span>
+          )}
+          {isClosed && !isFinished && (
+            <span className="flex items-center gap-1 text-[10px] text-[var(--color-muted)]">
+              <Lock className="size-3" /> Paris fermés
+            </span>
+          )}
+        </div>
 
-          {/* Teams + Score / VS */}
-          <div className="flex items-center justify-center gap-4 sm:gap-8">
-            {/* Home team */}
-            <div className="flex flex-1 flex-col items-center gap-2">
-              <Flag code={match.homeFlag} team={match.homeTeam} className="h-14 w-20 drop-shadow-lg sm:h-16 sm:w-24" />
-              <span className="max-w-28 truncate font-[family-name:var(--font-display)] text-base font-bold sm:text-lg">
-                {match.homeTeam}
-              </span>
+        {/* Corps : équipes */}
+        <div className="px-4 pt-5 pb-6">
+          <div className="flex items-center gap-2">
+            {/* Équipe A */}
+            <div className="flex-1 flex flex-col items-center gap-2 text-center">
+              {match.teamA.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={match.teamA.logoUrl}
+                  alt={match.teamA.name}
+                  className="size-14 rounded-xl object-contain"
+                />
+              ) : (
+                <div className="size-14 rounded-xl bg-[var(--color-surface-2)]" />
+              )}
+              <div>
+                <p
+                  className={`font-bold text-base leading-tight ${
+                    match.result === "TEAM_A"
+                      ? "text-[var(--color-accent)]"
+                      : "text-[var(--color-cream)]"
+                  }`}
+                >
+                  {match.teamA.name}
+                </p>
+                <p className="text-[10px] text-[var(--color-muted)] mt-0.5">
+                  {SOURCE_LABEL[match.teamASource]}
+                </p>
+                {!isFinished && (
+                  <p className="mt-1 text-sm font-bold text-[var(--color-accent)]">
+                    ×{oddsA}
+                  </p>
+                )}
+              </div>
             </div>
 
-            {/* Score (final / live) or VS */}
-            <div className="flex flex-col items-center gap-1">
-              {finished || live ? (
-                <div className="flex items-baseline gap-2">
-                  <span
-                    className={`font-[family-name:var(--font-display)] text-5xl font-extrabold tabular-nums sm:text-6xl ${live ? "text-red-400" : "text-gradient-gold"}`}
-                  >
-                    {(match.result ?? live)!.homeScore}
-                  </span>
-                  <span className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--color-muted)]">
-                    &ndash;
-                  </span>
-                  <span
-                    className={`font-[family-name:var(--font-display)] text-5xl font-extrabold tabular-nums sm:text-6xl ${live ? "text-red-400" : "text-gradient-gold"}`}
-                  >
-                    {(match.result ?? live)!.awayScore}
-                  </span>
-                </div>
+            {/* Centre VS / Score */}
+            <div className="w-20 shrink-0 text-center">
+              {isFinished ? (
+                <>
+                  <p className="text-4xl font-black tabular-nums">
+                    {match.scoreA}
+                    <span className="text-[var(--color-muted)] mx-1">-</span>
+                    {match.scoreB}
+                  </p>
+                  {match.result === "DRAW" && (
+                    <p className="text-[10px] text-[var(--color-muted)] mt-0.5">
+                      Nul
+                    </p>
+                  )}
+                </>
               ) : (
-                <div className="relative">
-                  <span className="font-[family-name:var(--font-display)] text-3xl font-extrabold uppercase tracking-wider text-[var(--color-muted)] animate-[glow-pulse_2s_ease-in-out_infinite]">
+                <>
+                  <p className="text-2xl font-black text-[var(--color-muted)]">
                     VS
-                  </span>
-                  <div className="absolute inset-0 -z-10 rounded-full bg-[var(--color-pitch)] opacity-10 blur-xl" />
-                </div>
+                  </p>
+                  {match.scheduledAt && (
+                    <p className="mt-1 text-[9px] text-[var(--color-muted)] leading-tight">
+                      {new Date(match.scheduledAt).toLocaleDateString("fr-FR", {
+                        weekday: "short",
+                        day: "numeric",
+                        month: "short",
+                      })}
+                      <br />
+                      {new Date(match.scheduledAt).toLocaleTimeString("fr-FR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  )}
+                </>
               )}
             </div>
 
-            {/* Away team */}
-            <div className="flex flex-1 flex-col items-center gap-2">
-              <Flag code={match.awayFlag} team={match.awayTeam} className="h-14 w-20 drop-shadow-lg sm:h-16 sm:w-24" />
-              <span className="max-w-28 truncate font-[family-name:var(--font-display)] text-base font-bold sm:text-lg">
-                {match.awayTeam}
-              </span>
+            {/* Équipe B */}
+            <div className="flex-1 flex flex-col items-center gap-2 text-center">
+              {match.teamB.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={match.teamB.logoUrl}
+                  alt={match.teamB.name}
+                  className="size-14 rounded-xl object-contain"
+                />
+              ) : (
+                <div className="size-14 rounded-xl bg-[var(--color-surface-2)]" />
+              )}
+              <div>
+                <p
+                  className={`font-bold text-base leading-tight ${
+                    match.result === "TEAM_B"
+                      ? "text-[var(--color-accent)]"
+                      : "text-[var(--color-cream)]"
+                  }`}
+                >
+                  {match.teamB.name}
+                </p>
+                <p className="text-[10px] text-[var(--color-muted)] mt-0.5">
+                  {SOURCE_LABEL[match.teamBSource]}
+                </p>
+                {!isFinished && (
+                  <p className="mt-1 text-sm font-bold text-[var(--color-accent)]">
+                    ×{oddsB}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
+        </div>
+      </Card>
 
-          {/* Kickoff time + Countdown */}
-          <div className="mt-6 flex flex-col items-center gap-3">
-            <span className="font-[family-name:var(--font-mono)] text-xs uppercase tracking-widest text-[var(--color-muted)]">
-              {formatKickoff(kickoff)}
-            </span>
+      {/* ── Formulaire de pari (match ouvert) ── */}
+      {isOpen && (
+        <BetForm
+          matchId={match.id}
+          teamA={match.teamA.name}
+          teamALogo={match.teamA.logoUrl ?? null}
+          teamB={match.teamB.name}
+          teamBLogo={match.teamB.logoUrl ?? null}
+          oddsA={oddsA}
+          oddsB={oddsB}
+          oddsDraw={oddsDraw}
+          allowDraw={allowDraw}
+          userWizz={user?.wizzBalance ?? 0}
+          jokersLeft={user?.jokersLeft ?? 0}
+          existingBet={
+            existingBet
+              ? {
+                  choice: existingBet.choice,
+                  amountWizz: existingBet.amountWizz,
+                  jokerUsed: existingBet.jokerUsed,
+                }
+              : null
+          }
+        />
+      )}
 
-            {!locked && (
-              <div className="glass mt-1 rounded-2xl px-6 py-3">
-                <CountdownTimer target={kickoff} />
-              </div>
-            )}
-
-            {(live || (locked && !finished)) && (
-              <div className="mt-1 inline-flex items-center gap-2 rounded-full bg-red-500/15 px-4 py-1.5">
-                <Radio className="size-3.5 animate-pulse text-red-400" />
-                <span className="text-xs font-bold uppercase tracking-wider text-red-400">
-                  {live ? "En direct" : "En cours"}
-                </span>
-              </div>
-            )}
-
-            {finished && (
-              <div className="mt-1 inline-flex items-center gap-2 rounded-full bg-[var(--color-gold)]/10 px-4 py-1.5">
-                <Trophy className="size-3.5 text-[var(--color-gold)]" />
-                <span className="text-xs font-semibold text-[var(--color-gold)]">
-                  Match terminé
-                </span>
+      {/* ── Résultat du pari (match terminé) ── */}
+      {isFinished && existingBet && (
+        <Card className={`p-4 border-l-4 ${betWon ? "border-l-green-500" : betLost ? "border-l-red-500" : "border-l-[var(--color-border-subtle)]"}`}>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)] mb-3">
+            Ton pari
+          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold">
+                {existingBet.choice === "TEAM_A"
+                  ? match.teamA.name
+                  : existingBet.choice === "TEAM_B"
+                  ? match.teamB.name
+                  : "Égalité"}
+                {existingBet.jokerUsed && (
+                  <span className="ml-2 text-xs text-[var(--color-muted)]">
+                    🃏 Joker ×2
+                  </span>
+                )}
+              </p>
+              <p className="text-xs text-[var(--color-muted)] mt-0.5">
+                Mise : {existingBet.amountWizz} Wizz
+              </p>
+            </div>
+            {existingBet.settled && existingBet.payout != null && (
+              <div className="text-right">
+                <p
+                  className={`text-xl font-black ${
+                    betWon ? "text-green-400" : "text-red-400"
+                  }`}
+                >
+                  {betWon
+                    ? `+${existingBet.payout - existingBet.amountWizz}`
+                    : `-${existingBet.amountWizz}`}
+                </p>
+                <p className="text-[10px] text-[var(--color-muted)]">Wizz</p>
               </div>
             )}
           </div>
+        </Card>
+      )}
 
-          {/* Decorative corner accents */}
-          <div className="pointer-events-none absolute -left-px -top-px h-16 w-16 rounded-tl-3xl border-l-2 border-t-2 border-[var(--color-pitch)]/20" />
-          <div className="pointer-events-none absolute -bottom-px -right-px h-16 w-16 rounded-br-3xl border-b-2 border-r-2 border-[var(--color-pitch)]/20" />
+      {/* ── Paris des autres joueurs ── */}
+      {match.bets.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+            Paris ({match.bets.length})
+          </p>
+          <div className="space-y-1">
+            {match.bets.map((bet) => (
+              <div
+                key={bet.id}
+                className="flex items-center justify-between rounded-lg bg-[var(--color-surface-2)] px-3 py-2 text-sm"
+              >
+                <span className="font-medium">{bet.user.name || "Anonyme"}</span>
+                <div className="flex items-center gap-2 text-[var(--color-muted)]">
+                  <span className="text-xs">{bet.amountWizz} Wizz</span>
+                  {bet.jokerUsed && <span className="text-xs">🃏</span>}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-
-      {/* ── Prediction / Predictions section ── */}
-      <section className="mt-8">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="h-5 w-1 rounded-full bg-[var(--color-gold)]" />
-          <h2 className="flex items-center gap-2 font-[family-name:var(--font-display)] text-lg font-bold">
-            {locked ? (
-              <>
-                <Users className="size-4 text-[var(--color-muted)]" />
-                Pronos des joueurs
-                {predictions.length > 0 && (
-                  <span className="font-[family-name:var(--font-mono)] text-sm font-normal text-[var(--color-muted)]">
-                    ({predictions.length})
-                  </span>
-                )}
-              </>
-            ) : (
-              "Ton pronostic"
-            )}
-          </h2>
-        </div>
-
-        {locked ? (
-          <MatchPredictions
-            predictions={predictions}
-            currentUserId={session?.user?.id}
-          />
-        ) : (
-          /* ── Open: show prediction form ── */
-          <PredictionForm
-            matchId={match.id}
-            homeTeam={match.homeTeam}
-            awayTeam={match.awayTeam}
-            homeFlag={match.homeFlag}
-            awayFlag={match.awayFlag}
-            kickoffAt={match.kickoffAt}
-            locked={locked}
-            initial={existing}
-            jokersLeft={jokersLeft}
-            jokerBudget={budget}
-          />
-        )}
-      </section>
-    </>
+      )}
+    </div>
   );
 }
