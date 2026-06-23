@@ -18,6 +18,7 @@ export const authConfig = {
       const isPublic =
         publicPaths.includes(nextUrl.pathname) ||
         nextUrl.pathname.startsWith("/api/auth") ||
+        nextUrl.pathname.startsWith("/api/uploads") ||
         nextUrl.pathname.startsWith("/invite") ||
         nextUrl.pathname.startsWith("/join") ||
         nextUrl.pathname.startsWith("/api/register");
