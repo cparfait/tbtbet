@@ -2,7 +2,7 @@
 
 # ⚽ TBT Bet
 
-### Le tournoi de babyfoot interne Withings — parie, grimpe, deviens champion
+### Le tournoi de babyfoot interne — parie, grimpe, deviens champion
 
 *Pronostique chaque match, joue tes jokers, chambre tes collègues dans le tchat.*
 
