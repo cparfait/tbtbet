@@ -36,7 +36,11 @@ export default async function PoolStandingsPage({
     orderBy: { scheduledAt: "asc" },
   });
 
+  // Ne pas afficher → WB / → LB tant qu'aucun match de poule n'a été joué
+  const anyMatchPlayed = matches.some((m) => m.status === "FINISHED");
+
   const rankLabel = (i: number) => {
+    if (!anyMatchPlayed) return null;
     if (i === 0) return { label: "→ WB", color: "text-green-400" };
     if (i === 1) return { label: "→ WB", color: "text-green-400" };
     return { label: "→ LB", color: "text-orange-400" };
@@ -83,7 +87,9 @@ export default async function PoolStandingsPage({
                     )}
                     <p className="text-sm font-medium truncate">{s.team.name}</p>
                   </div>
-                  <p className={`text-[10px] font-medium ${rank.color}`}>{rank.label}</p>
+                  {rank && (
+                    <p className={`text-[10px] font-medium ${rank.color}`}>{rank.label}</p>
+                  )}
                 </div>
                 <span className="text-xs text-center text-[var(--color-muted)]">{s.played}</span>
                 <span className="text-xs text-center">{s.wins}</span>
