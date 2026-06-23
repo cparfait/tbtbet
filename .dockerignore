@@ -5,3 +5,6 @@ node_modules
 .env.*
 npm-debug.log*
 README.md
+lib/generated
+*.tmp
+*.tmp.*
