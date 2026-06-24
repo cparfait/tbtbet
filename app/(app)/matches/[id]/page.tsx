@@ -54,10 +54,11 @@ export default async function MatchDetailPage({
 
   const isFinished = match.status === "FINISHED";
   const isLive = match.status === "LIVE";
+  const closesAt = match.bettingClosesAt ?? match.scheduledAt;
   const isClosed =
     !isFinished &&
-    match.bettingClosesAt != null &&
-    new Date(match.bettingClosesAt) <= new Date();
+    closesAt != null &&
+    new Date(closesAt) <= new Date();
   const isOpen = !isFinished && !isClosed;
 
   const betWon =

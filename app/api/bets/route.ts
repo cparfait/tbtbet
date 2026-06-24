@@ -55,7 +55,8 @@ export async function POST(req: NextRequest) {
     if (match.status !== "SCHEDULED") {
       return NextResponse.json({ error: "Les paris sont fermés pour ce match" }, { status: 400 });
     }
-    if (match.bettingClosesAt && new Date(match.bettingClosesAt) <= new Date()) {
+    const closesAt = match.bettingClosesAt ?? match.scheduledAt;
+    if (closesAt && new Date(closesAt) <= new Date()) {
       return NextResponse.json({ error: "La date limite de pari est dépassée" }, { status: 400 });
     }
     if (amountWizz > user.wizzBalance) {

@@ -166,7 +166,8 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
     const betChoice = bet?.choice === "TEAM_A" ? match.teamA.name
       : bet?.choice === "TEAM_B" ? (match.teamB?.name ?? "?")
       : bet?.choice === "DRAW" ? "Égalité" : null;
-    const isClosed = match.bettingClosesAt != null && new Date(match.bettingClosesAt) <= new Date();
+    const closesAt = match.bettingClosesAt ?? match.scheduledAt;
+    const isClosed = closesAt != null && new Date(closesAt) <= new Date();
     const canBet = !isClosed;
     const isExpanded = expandedId === match.id;
     const phaseStyle = getPhaseStyle(match.phase, match.teamA.pool);
