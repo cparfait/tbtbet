@@ -76,7 +76,7 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
               : "text-[var(--color-muted)] hover:text-[var(--color-cream)]"
           )}
         >
-          <Trophy className="size-3.5" /> Parieurs
+          <Trophy className="size-3.5" /> Global
         </button>
         <button
           onClick={() => setTab("teams")}
@@ -93,7 +93,7 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
 
       {/* ── Tab : Parieurs ── */}
       {tab === "players" && (
-        <div className="space-y-1">
+        <div className="space-y-2">
           {leaderboard.length === 0 ? (
             <Card className="p-4 text-center text-sm text-[var(--color-muted)]">
               Aucun joueur classé.

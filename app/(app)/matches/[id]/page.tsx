@@ -19,11 +19,6 @@ const PHASE_LABEL: Record<string, string> = {
   FINAL_SERIES: "Finale (BO3)",
 };
 
-const SOURCE_LABEL: Record<string, string> = {
-  POOL: "Poule",
-  WINNER_BRACKET: "Winner",
-  LOSER_BRACKET: "Loser",
-};
 
 export default async function MatchDetailPage({
   params,
@@ -121,14 +116,6 @@ export default async function MatchDetailPage({
                 >
                   {match.teamA.name}
                 </p>
-                <p className="text-[10px] text-[var(--color-muted)] mt-0.5">
-                  {SOURCE_LABEL[match.teamASource]}
-                </p>
-                {!isFinished && (
-                  <p className="mt-1 text-sm font-bold text-[var(--color-accent)]">
-                    ×{oddsA}
-                  </p>
-                )}
               </div>
             </div>
 
@@ -183,14 +170,6 @@ export default async function MatchDetailPage({
                 >
                   {match.teamB?.name ?? "À déterminer"}
                 </p>
-                <p className="text-[10px] text-[var(--color-muted)] mt-0.5">
-                  {SOURCE_LABEL[match.teamBSource]}
-                </p>
-                {!isFinished && (
-                  <p className="mt-1 text-sm font-bold text-[var(--color-accent)]">
-                    ×{oddsB}
-                  </p>
-                )}
               </div>
             </div>
           </div>
@@ -264,6 +243,7 @@ export default async function MatchDetailPage({
           </div>
         </Card>
       )}
+
 
       {/* ── Paris des autres joueurs ── */}
       {match.bets.length > 0 && (

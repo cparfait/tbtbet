@@ -30,7 +30,7 @@ export function WelcomeModal({ initialName }: { initialName: string }) {
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
       {/* Panel */}
-      <div className="relative z-10 w-full max-w-md rounded-t-3xl sm:rounded-3xl glass-strong p-6 pb-10 sm:pb-6 shadow-2xl shadow-black/60">
+      <div className="relative z-10 w-full max-w-md rounded-t-3xl sm:rounded-3xl glass-strong overflow-y-auto max-h-[90dvh] p-6 pb-10 sm:pb-6 shadow-2xl shadow-black/60">
         <div className="mb-6 text-center">
           <p className="text-3xl mb-2">⚽</p>
           <h2 className="text-xl font-bold text-[var(--color-cream)] font-[family-name:var(--font-display)]">

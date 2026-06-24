@@ -134,7 +134,9 @@ export function BetForm({
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <label className="text-[10px] text-[var(--color-muted)]">Mise</label>
-          <span className="text-sm font-black text-[var(--color-cream)]">{amount} Wizz</span>
+          <span className="flex items-center gap-0.5 text-sm font-black text-[var(--color-cream)]">
+            <Zap className="size-3.5 text-[var(--color-accent)]" />{amount} Wizz
+          </span>
         </div>
         <input
           type="range"
@@ -182,7 +184,9 @@ export function BetForm({
       <div className="flex items-center justify-between rounded-xl bg-[var(--color-surface-2)] px-3 py-2">
         <div>
           <p className="text-[9px] text-[var(--color-muted)]">Gain potentiel</p>
-          <p className="text-lg font-black text-[var(--color-accent)]">+{potentialGain} Wizz</p>
+          <p className="flex items-center gap-0.5 text-lg font-black text-[var(--color-accent)]">
+            <Zap className="size-4" />+{potentialGain} Wizz
+          </p>
         </div>
         <div className="text-right">
           <p className="text-[9px] text-[var(--color-muted)]">cote ×{effectiveOdds}</p>

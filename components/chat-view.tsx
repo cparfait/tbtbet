@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, SmilePlus, Pin, PinOff, Trash2 } from "lucide-react";
 
-const REACTION_EMOJIS = ["👍", "😂", "🔥", "😮", "⚽", "💀"];
+const REACTION_EMOJIS = ["👍", "😂", "🔥", "😮", "⚽", "💀", "💛", "🤓", "😑", "😏", "😢"];
 
 type Reaction = { emoji: string; count: number; mine: boolean };
 
@@ -204,7 +204,7 @@ export function ChatView({ currentUserId, isAdmin = false }: Props) {
                   )}
 
                   {/* Actions (hover) */}
-                  <div className="mt-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="mt-1 flex gap-1">
                     <button
                       onClick={() => setPickerMsgId(pickerMsgId === msg.id ? null : msg.id)}
                       className="rounded p-0.5 text-[var(--color-muted)] hover:text-[var(--color-cream)]"
