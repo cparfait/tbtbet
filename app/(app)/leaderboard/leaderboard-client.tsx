@@ -121,36 +121,42 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
 
               {/* ── Classement complet ── */}
               {leaderboard.map((user, i) => (
-                <Card
+                <Link
                   key={user.id}
-                  className={cn(
-                    "flex items-center gap-3 p-3",
-                    i === 0 && "border-[var(--color-gold)]/30 bg-[var(--color-gold)]/[0.04]",
-                    user.id === currentUserId && "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/5"
-                  )}
+                  href={user.id === currentUserId ? "/profile" : `/players/${user.id}`}
                 >
-                   {/* Rang + évolution */}
-                   <div className="flex w-9 shrink-0 flex-col items-center">
-                     <span className="font-[family-name:var(--font-display)] text-lg font-bold leading-none">
-                       {MEDALS[i] ?? i + 1}
-                     </span>
-                     <Evolution value={user.evolution} />
-                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={cn("text-sm font-medium truncate", i === 0 && "font-bold")}>
-                      {user.name || "Anonyme"}
-                      {user.id === currentUserId && (
-                        <span className="ml-1.5 text-[10px] text-[var(--color-muted)]">(toi)</span>
-                      )}
+                  <Card
+                    className={cn(
+                      "flex items-center gap-3 p-3 transition-colors",
+                      i === 0 && "border-[var(--color-gold)]/30 bg-[var(--color-gold)]/[0.04]",
+                      user.id === currentUserId
+                        ? "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/5"
+                        : "hover:border-[var(--color-accent)]/20"
+                    )}
+                  >
+                     {/* Rang + évolution */}
+                     <div className="flex w-9 shrink-0 flex-col items-center">
+                       <span className="font-[family-name:var(--font-display)] text-lg font-bold leading-none">
+                         {MEDALS[i] ?? i + 1}
+                       </span>
+                       <Evolution value={user.evolution} />
+                     </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn("text-sm font-medium truncate", i === 0 && "font-bold")}>
+                        {user.name || "Anonyme"}
+                        {user.id === currentUserId && (
+                          <span className="ml-1.5 text-[10px] text-[var(--color-muted)]">(toi)</span>
+                        )}
+                      </p>
+                    </div>
+                    <p className={cn(
+                      "shrink-0 text-sm font-bold tabular-nums",
+                      i === 0 ? "text-[var(--color-gold-bright)]" : "text-[var(--color-accent)]"
+                    )}>
+                      {user.wizzBalance} Wizz
                     </p>
-                  </div>
-                  <p className={cn(
-                    "shrink-0 text-sm font-bold tabular-nums",
-                    i === 0 ? "text-[var(--color-gold-bright)]" : "text-[var(--color-accent)]"
-                  )}>
-                    {user.wizzBalance} Wizz
-                  </p>
-                </Card>
+                  </Card>
+                </Link>
               ))}
             </>
           )}

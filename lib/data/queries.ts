@@ -424,3 +424,44 @@ export async function getAdminUsers() {
     orderBy: { createdAt: "desc" },
   });
 }
+
+// ─────────────────────────────────────────────
+// Comparaison joueurs
+// ─────────────────────────────────────────────
+
+export async function getPlayerComparison(currentUserId: string, targetUserId: string) {
+  const [currentUser, targetUser, matches] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: { id: true, name: true, avatarUrl: true, image: true, wizzBalance: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, name: true, avatarUrl: true, image: true, wizzBalance: true },
+    }),
+    prisma.match.findMany({
+      where: {
+        status: "FINISHED",
+        bets: { some: { userId: { in: [currentUserId, targetUserId] } } },
+      },
+      include: {
+        teamA: { select: { id: true, name: true, logoUrl: true } },
+        teamB: { select: { id: true, name: true, logoUrl: true } },
+        bets: {
+          where: { userId: { in: [currentUserId, targetUserId] } },
+          select: {
+            userId: true,
+            choice: true,
+            amountWizz: true,
+            payout: true,
+            settled: true,
+            jokerUsed: true,
+          },
+        },
+      },
+      orderBy: { scheduledAt: "desc" },
+    }),
+  ]);
+
+  return { currentUser, targetUser, matches };
+}
