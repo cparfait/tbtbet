@@ -1,12 +1,15 @@
+
 "use client";
 
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Trophy, ChevronRight, Users } from "lucide-react";
+import { Trophy, ChevronRight, Users, ArrowUp, ArrowDown, Minus } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+const MEDALS = ["\u{1F947}", "\u{1F948}", "\u{1F949}"];
 
 interface LeaderboardUser {
   id: string;
@@ -14,6 +17,7 @@ interface LeaderboardUser {
   avatarUrl: string | null;
   wizzBalance: number;
   jokersLeft: number;
+  evolution: number | null;
 }
 
 interface TeamStanding {
@@ -51,10 +55,10 @@ interface Props {
 
 // ── Composant principal ────────────────────────────────────────────────────────
 
-const RANK_EMOJI = ["🥇", "🥈", "🥉"];
-
 export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, currentUserId }: Props) {
   const [tab, setTab] = useState<"players" | "teams">("players");
+
+  const top3 = leaderboard.slice(0, 3);
 
   return (
     <div className="space-y-5">
@@ -64,9 +68,9 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
         <button
           onClick={() => setTab("players")}
           className={cn(
-            "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-colors",
+            "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-all duration-200",
             tab === "players"
-              ? "bg-[var(--color-surface-1)] text-[var(--color-cream)]"
+              ? "bg-[var(--color-accent)]/15 text-[var(--color-accent-bright)] shadow-[0_0_12px_var(--color-accent-glow)]"
               : "text-[var(--color-muted)] hover:text-[var(--color-cream)]"
           )}
         >
@@ -75,9 +79,9 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
         <button
           onClick={() => setTab("teams")}
           className={cn(
-            "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-colors",
+            "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-all duration-200",
             tab === "teams"
-              ? "bg-[var(--color-surface-1)] text-[var(--color-cream)]"
+              ? "bg-[var(--color-accent)]/15 text-[var(--color-accent-bright)] shadow-[0_0_12px_var(--color-accent-glow)]"
               : "text-[var(--color-muted)] hover:text-[var(--color-cream)]"
           )}
         >
@@ -93,30 +97,62 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
               Aucun joueur classé.
             </Card>
           ) : (
-            leaderboard.map((user, i) => (
-              <Card
-                key={user.id}
-                className={cn(
-                  "flex items-center gap-3 p-3",
-                  user.id === currentUserId && "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/5"
-                )}
-              >
-                <span className="w-6 shrink-0 text-center text-sm font-bold">
-                  {RANK_EMOJI[i] ?? `#${i + 1}`}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    {user.name || "Anonyme"}
-                    {user.id === currentUserId && (
-                      <span className="ml-1.5 text-[10px] text-[var(--color-muted)]">(toi)</span>
-                    )}
-                  </p>
+            <>
+              {/* ── Podium ── */}
+              {top3.length > 0 && (
+                <div className="flex items-end justify-center gap-3 px-2 pt-4 pb-8">
+                  {top3[1] && (
+                    <PodiumCard rank={2} name={top3[1].name || "Anonyme"} points={top3[1].wizzBalance} index={1} />
+                  )}
+                  {top3[0] && (
+                    <PodiumCard
+                      rank={1}
+                      name={top3[0].name || "Anonyme"}
+                      points={top3[0].wizzBalance}
+                      index={0}
+                      champion
+                    />
+                  )}
+                  {top3[2] && (
+                    <PodiumCard rank={3} name={top3[2].name || "Anonyme"} points={top3[2].wizzBalance} index={2} />
+                  )}
                 </div>
-                <p className="shrink-0 text-sm font-bold text-[var(--color-accent)]">
-                  {user.wizzBalance} Wizz
-                </p>
-              </Card>
-            ))
+              )}
+
+              {/* ── Classement complet ── */}
+              {leaderboard.map((user, i) => (
+                <Card
+                  key={user.id}
+                  className={cn(
+                    "flex items-center gap-3 p-3",
+                    i === 0 && "border-[var(--color-gold)]/30 bg-[var(--color-gold)]/[0.04]",
+                    user.id === currentUserId && "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/5"
+                  )}
+                >
+                   {/* Rang + évolution */}
+                   <div className="flex w-9 shrink-0 flex-col items-center">
+                     <span className="font-[family-name:var(--font-display)] text-lg font-bold leading-none">
+                       {MEDALS[i] ?? i + 1}
+                     </span>
+                     <Evolution value={user.evolution} />
+                   </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={cn("text-sm font-medium truncate", i === 0 && "font-bold")}>
+                      {user.name || "Anonyme"}
+                      {user.id === currentUserId && (
+                        <span className="ml-1.5 text-[10px] text-[var(--color-muted)]">(toi)</span>
+                      )}
+                    </p>
+                  </div>
+                  <p className={cn(
+                    "shrink-0 text-sm font-bold tabular-nums",
+                    i === 0 ? "text-[var(--color-gold-bright)]" : "text-[var(--color-accent)]"
+                  )}>
+                    {user.wizzBalance} Wizz
+                  </p>
+                </Card>
+              ))}
+            </>
           )}
         </div>
       )}
@@ -152,7 +188,10 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
                 {pool.standings.length === 0 ? (
                   <Card className="p-3 text-xs text-[var(--color-muted)] text-center">Pas encore de matchs joués</Card>
                 ) : (
-                  <Card className="overflow-hidden divide-y divide-[var(--color-border-subtle)]">
+                  <Card
+                    className="overflow-hidden divide-y divide-[var(--color-border-subtle)]"
+                    style={{ borderColor: pool.color, borderWidth: "1.5px" }}
+                  >
                     {/* Entête colonnes */}
                     <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
                       <span>Équipe</span>
@@ -226,6 +265,102 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─── Flèche d'évolution ─── */
+function Evolution({ value }: { value: number | null }) {
+  if (value == null) return null;
+  if (value > 0) {
+    return (
+      <span className="inline-flex items-center text-[10px] font-bold leading-none text-[var(--color-pitch-bright)]">
+        <ArrowUp className="size-3" />
+        {value}
+      </span>
+    );
+  }
+  if (value < 0) {
+    return (
+      <span className="inline-flex items-center text-[10px] font-bold leading-none text-red-400">
+        <ArrowDown className="size-3" />
+        {Math.abs(value)}
+      </span>
+    );
+  }
+  return <Minus className="size-3 text-[var(--color-muted)]/50" />;
+}
+
+/* ─── Podium card ─── */
+function PodiumCard({
+  rank,
+  name,
+  points,
+  index,
+  champion = false,
+}: {
+  rank: number;
+  name: string;
+  points: number;
+  index: number;
+  champion?: boolean;
+}) {
+  const heights = ["h-40", "h-28", "h-24"] as const;
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-center gap-2",
+        champion && "animate-stagger",
+        !champion && `stagger-${index + 1}`
+      )}
+      style={{ animationDelay: champion ? "0ms" : `${(index + 1) * 150}ms` }}
+    >
+      {champion && (
+        <span className="text-2xl drop-shadow-[0_0_8px_var(--color-gold)]">
+          {"\u{1F451}"}
+        </span>
+      )}
+
+      <div
+        className={cn(
+          "flex items-center justify-center rounded-full border-2 font-[family-name:var(--font-display)] font-bold",
+          champion
+            ? "h-16 w-16 border-[var(--color-gold)] bg-[var(--color-gold)]/10 text-2xl text-[var(--color-gold-bright)] shadow-[0_0_20px_var(--color-gold)]/30"
+            : "h-12 w-12 border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] text-lg text-[var(--color-cream)]"
+        )}
+      >
+        {name[0]}
+      </div>
+
+      <p
+        className={cn(
+          "font-[family-name:var(--font-display)] font-semibold truncate max-w-[80px]",
+          champion ? "text-sm" : "text-xs"
+        )}
+      >
+        {name}
+      </p>
+      <p
+        className={cn(
+          "font-[family-name:var(--font-display)] font-bold tabular-nums",
+          champion
+            ? "text-xl text-[var(--color-gold-bright)]"
+            : "text-base text-[var(--color-gold)]"
+        )}
+      >
+        {points} Wizz
+      </p>
+
+      <div
+        className={cn(
+          "w-full rounded-t-lg",
+          heights[rank - 1],
+          champion
+            ? "w-24 bg-gradient-to-t from-[var(--color-gold)]/20 to-[var(--color-gold)]/5 border border-[var(--color-gold)]/20"
+            : "w-20 bg-[var(--color-surface-2)] border border-[var(--color-border-subtle)]"
+        )}
+      />
     </div>
   );
 }

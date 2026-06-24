@@ -27,8 +27,9 @@ model User {
   googleId      String?   @unique
   role          Role      @default(USER)
   banned        Boolean   @default(false)
-  wizzBalance   Int       @default(100)
-  jokersLeft    Int       @default(2)
+  wizzBalance      Int       @default(100)
+  previousWizzRank Int?
+  jokersLeft       Int       @default(2)
   createdAt     DateTime  @default(now())
   lastSeenAt    DateTime?
 

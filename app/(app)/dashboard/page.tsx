@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import { auth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/page-header";
+import { UserAvatarMenu } from "@/components/user-avatar-menu";
 import {
   getUserById,
   getScheduledMatches,
@@ -51,8 +54,38 @@ export default async function DashboardPage() {
 
   const nextMatch = matches[0] ?? null;
 
+  const firstName = user.name?.split(" ")[0] ?? "Joueur";
+
   return (
     <div className="space-y-5 pt-1">
+      <PageHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            Salut {firstName}
+            <Image
+              src="/logo.png"
+              alt="TBT Bet"
+              width={30}
+              height={30}
+              className="inline-block drop-shadow-[0_0_6px_var(--color-accent)]/40"
+            />
+          </span>
+        }
+        subtitle="Prêt à parier ?"
+        action={
+          <UserAvatarMenu
+            user={{
+              name: user.name,
+              email: user.email,
+              avatarUrl: user.avatarUrl,
+              image: user.image,
+              role: user.role,
+              wizzBalance: user.wizzBalance,
+            }}
+          />
+        }
+      />
+
       {/* Stats */}
       <div className="grid grid-cols-3 gap-2">
         <Card className="p-3 text-center">

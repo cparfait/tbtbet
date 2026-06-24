@@ -56,5 +56,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Erreur lors de la sauvegarde" }, { status: 500 });
   }
 
-  return NextResponse.json({ url: `/api/uploads/logos/${filename}` });
+  return NextResponse.json({ url: `/uploads/logos/${filename}` });
 }

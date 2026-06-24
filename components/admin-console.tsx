@@ -4,8 +4,8 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { Users, Swords, Trophy, Plus, Trash2, CheckCircle2, Calendar, RefreshCw, ImageIcon, Check, X, Upload } from "lucide-react";
+import { cn, dayKey, dayLabel, formatKickoffTime } from "@/lib/utils";
+import { Users, Swords, Trophy, Plus, Trash2, CheckCircle2, Calendar, RefreshCw, ImageIcon, Upload } from "lucide-react";
 
 // ── Types ──
 
@@ -98,9 +98,6 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
   const [teamPlayer1, setTeamPlayer1] = useState("");
   const [teamPlayer2, setTeamPlayer2] = useState("");
   const [teamLogoUrl, setTeamLogoUrl] = useState("");
-  // Team logo edit
-  const [editLogoTeamId, setEditLogoTeamId] = useState<string | null>(null);
-  const [editLogoUrl, setEditLogoUrl] = useState("");
 
   // Pool form
   const [poolName, setPoolName] = useState("");
@@ -171,7 +168,6 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
   async function handleSaveLogo(teamId: string, logoUrl: string) {
     try {
       await apiCall("/api/admin/teams", "PATCH", { id: teamId, logoUrl: logoUrl || null });
-      setEditLogoTeamId(null);
       ok("Logo mis à jour.");
     } catch (e) { err(e); }
   }
@@ -209,7 +205,8 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
       if (uploadTarget === "create") {
         setTeamLogoUrl(url);
       } else if (uploadTarget) {
-        setEditLogoUrl(url);
+        // Upload direct depuis la liste → sauvegarder immédiatement
+        await handleSaveLogo(uploadTarget, url);
       }
     } catch (e) {
       err(e);
@@ -306,7 +303,42 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
   }
 
   const pendingMatches = matches.filter((m) => m.status === "SCHEDULED" || m.status === "LIVE");
-  const poolMatches = matches.filter((m) => m.phase === "POOL");
+
+  // Groupement de la liste : matchs datés → par jour, matchs sans date → par poule / bracket
+  const pendingGrouped = (() => {
+    const poolMap = new Map(pools.map((p) => [p.id, p]));
+    const withDate = pendingMatches
+      .filter((m): m is Match & { scheduledAt: Date | string } => m.scheduledAt != null)
+      .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+    const noDate = pendingMatches.filter((m) => !m.scheduledAt);
+
+    const byDayMap = new Map<string, Match[]>();
+    for (const m of withDate) {
+      const key = dayKey(m.scheduledAt);
+      if (!byDayMap.has(key)) byDayMap.set(key, []);
+      byDayMap.get(key)!.push(m);
+    }
+
+    const byPoolMap = new Map<string, Match[]>();
+    const bracket: Match[] = [];
+    for (const m of noDate) {
+      if (m.phase === "POOL" && m.teamA.poolId) {
+        if (!byPoolMap.has(m.teamA.poolId)) byPoolMap.set(m.teamA.poolId, []);
+        byPoolMap.get(m.teamA.poolId)!.push(m);
+      } else {
+        bracket.push(m);
+      }
+    }
+    return { byDay: [...byDayMap.entries()], byPool: [...byPoolMap.entries()], bracket, poolMap };
+  })();
+  const poolMatches = matches
+    .filter((m) => m.phase === "POOL")
+    .sort((a, b) => {
+      if (!a.scheduledAt && !b.scheduledAt) return 0;
+      if (!a.scheduledAt) return -1;
+      if (!b.scheduledAt) return 1;
+      return new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime();
+    });
   const bracketMatches = matches.filter((m) => m.phase !== "POOL");
 
   const selectedMatchForResult = pendingMatches.find((m) => m.id === resultMatchId);
@@ -336,22 +368,24 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
       />
 
       {/* Tabs */}
-      <div className="flex gap-1 overflow-x-auto pb-1">
-        {TABS.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={cn(
-              "flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors",
-              tab === key
-                ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
-                : "text-[var(--color-muted)] hover:text-[var(--color-cream)]"
-            )}
-          >
-            <Icon className="size-3.5" />
-            {label}
-          </button>
-        ))}
+      <div className="rounded-xl bg-[var(--color-surface)] border border-[var(--color-border-subtle)] p-1">
+        <div className="flex flex-wrap gap-1">
+          {TABS.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={cn(
+                "flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
+                tab === key
+                  ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
+                  : "text-[var(--color-muted)] hover:text-[var(--color-cream)]"
+              )}
+            >
+              <Icon className="size-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {message && (
@@ -423,118 +457,93 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
             </Button>
           </Card>
 
-          {/* Liste équipes */}
-          <div className="space-y-1">
-            {teams.map((team) => (
-              <Card key={team.id} className="p-3 space-y-2">
-                <div className="flex items-start gap-3">
-                  {/* Logo cliquable pour éditer */}
-                  <button
-                    onClick={() => {
-                      if (editLogoTeamId === team.id) {
-                        setEditLogoTeamId(null);
-                      } else {
-                        setEditLogoTeamId(team.id);
-                        setEditLogoUrl(team.logoUrl ?? "");
-                      }
-                    }}
-                    className="shrink-0 relative group size-12 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] overflow-hidden flex items-center justify-center"
-                    title="Modifier le logo"
-                  >
-                    {team.logoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={team.logoUrl} alt={team.name} className="size-full object-contain" />
-                    ) : (
-                      <ImageIcon className="size-4 text-[var(--color-muted)]" />
-                    )}
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="text-[9px] text-white font-medium">URL</span>
-                    </div>
-                  </button>
+          {/* Liste équipes — groupées par poule */}
+          {(() => {
+            const teamsWithoutPool = teams.filter((t) => !t.poolId);
+            const teamsByPool = pools.map((pool) => ({
+              pool,
+              teams: teams.filter((t) => t.poolId === pool.id),
+            }));
 
-                  {/* Info + pool */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{team.name}</p>
-                    <p className="text-[10px] text-[var(--color-muted)]">
-                      {[team.player1, team.player2].filter(Boolean).join(" & ") || "—"}
-                    </p>
-                    <select
-                      value={team.poolId ?? ""}
-                      onChange={(e) => handleAssignTeamToPool(team.id, e.target.value)}
-                      className="mt-1 rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2 py-0.5 text-[10px]"
-                    >
-                      <option value="">Pas de poule</option>
-                      {pools.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                  </div>
-
-                  <button onClick={() => handleDeleteTeam(team.id)} className="shrink-0 text-red-400 hover:text-red-300 mt-0.5">
-                    <Trash2 className="size-4" />
-                  </button>
-                </div>
-
-                {/* Éditeur de logo inline */}
-                {editLogoTeamId === team.id && (
-                  <div className="flex flex-col gap-2 pt-1 border-t border-[var(--color-border-subtle)]">
-                    <p className="text-[10px] text-[var(--color-muted)]">URL du logo</p>
-                    <div className="flex gap-2 items-start">
-                      {/* Aperçu live */}
-                      <div className="shrink-0 size-14 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] overflow-hidden flex items-center justify-center">
-                        {editLogoUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={editLogoUrl}
-                            alt="aperçu"
-                            className="size-full object-contain"
-                            onError={(e) => { e.currentTarget.style.opacity = "0.15"; }}
-                          />
-                        ) : (
-                          <ImageIcon className="size-4 text-[var(--color-muted)]" />
-                        )}
-                      </div>
-                      <div className="flex-1 space-y-1.5">
-                        <div className="flex gap-1.5">
-                          <input
-                            type="url"
-                            placeholder="https://..."
-                            value={editLogoUrl}
-                            onChange={(e) => setEditLogoUrl(e.target.value)}
-                            className="flex-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-xs"
-                            autoFocus
-                          />
-                          <button
-                            type="button"
-                            onClick={() => triggerUpload(team.id)}
-                            disabled={uploading}
-                            className="shrink-0 flex items-center gap-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2.5 text-[var(--color-muted)] hover:text-[var(--color-cream)] disabled:opacity-40"
-                            title="Uploader JPG/PNG"
-                          >
-                            {uploading && uploadTarget === team.id
-                              ? <span className="text-[9px]">…</span>
-                              : <Upload className="size-3.5" />}
-                          </button>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleSaveLogo(team.id, editLogoUrl)}
-                            className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-[var(--color-accent)]/10 px-3 py-1.5 text-xs font-medium text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20"
-                          >
-                            <Check className="size-3" /> Sauvegarder
-                          </button>
-                          <button
-                            onClick={() => setEditLogoTeamId(null)}
-                            className="flex items-center justify-center rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 text-[var(--color-muted)] hover:text-[var(--color-cream)]"
-                          >
-                            <X className="size-3" />
-                          </button>
-                        </div>
-                      </div>
+            return (
+              <div className="space-y-4">
+                {/* Équipes sans poule */}
+                {teamsWithoutPool.length > 0 && (
+                  <div>
+                    <h3 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-muted)] mb-1.5">
+                      Sans poule ({teamsWithoutPool.length})
+                    </h3>
+                    <div className="space-y-1">
+                      {teamsWithoutPool.map((team) => renderTeamCard(team))}
                     </div>
                   </div>
                 )}
-              </Card>
-            ))}
-          </div>
+
+                {/* Équipes par poule */}
+                {teamsByPool.map(({ pool, teams: poolTeams }) =>
+                  poolTeams.length > 0 ? (
+                    <div key={pool.id}>
+                      <h3
+                        className="text-[10px] font-semibold uppercase tracking-wider mb-1.5"
+                        style={{ color: pool.color }}
+                      >
+                        {pool.name} ({poolTeams.length})
+                      </h3>
+                      <div className="space-y-1">
+                        {poolTeams.map((team) => renderTeamCard(team))}
+                      </div>
+                    </div>
+                  ) : null
+                )}
+              </div>
+            );
+
+            function renderTeamCard(team: Team) {
+              return (
+                <Card key={team.id} className="p-3">
+                  <div className="flex items-start gap-3">
+                    {/* Logo cliquable → ouvre le sélecteur de fichier */}
+                    <button
+                      onClick={() => triggerUpload(team.id)}
+                      disabled={uploading}
+                      className="shrink-0 relative group size-12 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] overflow-hidden flex items-center justify-center"
+                      title="Changer le logo"
+                    >
+                      {team.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={team.logoUrl} alt={team.name} className="size-full object-contain" />
+                      ) : (
+                        <ImageIcon className="size-4 text-[var(--color-muted)]" />
+                      )}
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Upload className="size-4 text-white" />
+                      </div>
+                    </button>
+
+                    {/* Info + pool */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{team.name}</p>
+                      <p className="text-[10px] text-[var(--color-muted)]">
+                        {[team.player1, team.player2].filter(Boolean).join(" & ") || "—"}
+                      </p>
+                      <select
+                        value={team.poolId ?? ""}
+                        onChange={(e) => handleAssignTeamToPool(team.id, e.target.value)}
+                        className="mt-1 rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2 py-0.5 text-[10px]"
+                      >
+                        <option value="">Pas de poule</option>
+                        {pools.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    </div>
+
+                    <button onClick={() => handleDeleteTeam(team.id)} className="shrink-0 text-red-400 hover:text-red-300 mt-0.5">
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                </Card>
+              );
+            }
+          })()}
         </div>
       )}
 
@@ -659,39 +668,30 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                           </p>
                         )}
                       </div>
-                      <div className="flex gap-1 shrink-0">
+                      <div className="flex gap-1 shrink-0 items-center">
                         {match.status !== "FINISHED" && (
-                          <button
-                            onClick={() => {
-                              setEditDateMatchId(match.id);
-                              setEditDateValue(match.scheduledAt
+                          <>
+                            <input
+                              type="datetime-local"
+                              className="w-[130px] rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-1.5 py-1 text-[10px] text-[var(--color-cream)] [color-scheme:dark]"
+                              value={match.scheduledAt
                                 ? new Date(match.scheduledAt).toISOString().slice(0, 16)
-                                : "");
-                            }}
-                            className="text-[10px] px-2 py-1 rounded bg-[var(--color-surface-2)] text-[var(--color-muted)] hover:text-[var(--color-cream)]"
-                          >
-                            <Calendar className="size-3.5" />
-                          </button>
+                                : ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                apiCall("/api/admin/matches", "PATCH", {
+                                  id: match.id,
+                                  scheduledAt: val || null,
+                                }).then(() => ok("Date mise à jour.")).catch(err);
+                              }}
+                            />
+                          </>
                         )}
                         <button onClick={() => handleDeleteMatch(match.id)} className="text-red-400 hover:text-red-300">
                           <Trash2 className="size-3.5" />
                         </button>
                       </div>
                     </div>
-                    {editDateMatchId === match.id && (
-                      <div className="mt-2 flex gap-2">
-                        <input
-                          type="datetime-local"
-                          value={editDateValue}
-                          onChange={(e) => setEditDateValue(e.target.value)}
-                          className="flex-1 rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2 py-1 text-xs"
-                        />
-                        <button onClick={() => handleSaveMatchDate(match.id)}
-                          className="text-[10px] px-2 py-1 rounded bg-[var(--color-accent)]/10 text-[var(--color-accent)]">OK</button>
-                        <button onClick={() => setEditDateMatchId(null)}
-                          className="text-[10px] px-2 py-1 rounded text-[var(--color-muted)]">×</button>
-                      </div>
-                    )}
                   </Card>
                 ))}
               </div>
@@ -779,24 +779,128 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
         <div className="space-y-4">
           <Card className="p-3 space-y-2">
             <h3 className="text-sm font-semibold">Saisir un résultat</h3>
-            <select
-              value={resultMatchId}
-              onChange={(e) => {
-                const newId = e.target.value;
-                setResultMatchId(newId);
-                const newMatch = pendingMatches.find((m) => m.id === newId);
-                if (newMatch && newMatch.phase !== "POOL" && resultWinner === "DRAW") {
-                  setResultWinner("TEAM_A");
-                }
-              }}
-              className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-3 py-2 text-sm">
-              <option value="">-- Choisir un match --</option>
-              {pendingMatches.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label || "Match"} — {m.teamA.name} vs {m.teamB.name}
-                </option>
+            {/* Liste des matchs en attente — groupée par date puis par poule */}
+            <div className="max-h-56 overflow-y-auto rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] p-1.5 space-y-2">
+              {pendingMatches.length === 0 && (
+                <p className="text-xs text-[var(--color-muted)] text-center py-2">Aucun match en attente.</p>
+              )}
+
+              {/* Matchs datés → groupés par jour */}
+              {pendingGrouped.byDay.map(([dayKeyStr, dayMatches]) => (
+                <div key={dayKeyStr}>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-[var(--color-muted)] px-1.5 py-1">
+                    {dayLabel(dayMatches[0]!.scheduledAt!)}
+                  </p>
+                  {dayMatches.map((m) => {
+                    const pool = m.teamA.poolId ? pendingGrouped.poolMap.get(m.teamA.poolId) : null;
+                    const isSelected = resultMatchId === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setResultMatchId(isSelected ? "" : m.id);
+                          if (!isSelected && m.phase !== "POOL" && resultWinner === "DRAW") setResultWinner("TEAM_A");
+                        }}
+                        className={cn(
+                          "w-full text-left rounded-md px-2 py-1.5 text-xs transition-colors flex items-center gap-1.5",
+                          isSelected
+                            ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
+                            : "hover:bg-[var(--color-surface-1)] text-[var(--color-cream)]"
+                        )}
+                      >
+                        {pool && (
+                          <span
+                            className="shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold"
+                            style={{ background: pool.color + "30", color: pool.color }}
+                          >
+                            {pool.name}
+                          </span>
+                        )}
+                        <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB.name}</span>
+                        <span className="shrink-0 text-[9px] text-[var(--color-muted)]">
+                          {formatKickoffTime(m.scheduledAt!)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               ))}
-            </select>
+
+              {/* Matchs sans date → groupés par poule */}
+              {pendingGrouped.byPool.map(([poolId, poolMatches]) => {
+                const pool = pendingGrouped.poolMap.get(poolId);
+                return (
+                  <div key={poolId}>
+                    <p
+                      className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-1"
+                      style={pool ? { color: pool.color } : undefined}
+                    >
+                      {pool?.name ?? "Poule"}
+                    </p>
+                    {poolMatches.map((m) => {
+                      const isSelected = resultMatchId === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            setResultMatchId(isSelected ? "" : m.id);
+                          }}
+                          className={cn(
+                            "w-full text-left rounded-md px-2 py-1.5 text-xs transition-colors flex items-center gap-1.5",
+                            isSelected
+                              ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
+                              : "hover:bg-[var(--color-surface-1)] text-[var(--color-cream)]"
+                          )}
+                        >
+                          <span
+                            className="shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold"
+                            style={pool ? { background: pool.color + "30", color: pool.color } : undefined}
+                          >
+                            {pool?.name ?? "?"}
+                          </span>
+                          <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+
+              {/* Matchs sans date de bracket / finale */}
+              {pendingGrouped.bracket.length > 0 && (
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-[var(--color-muted)] px-1.5 py-1">
+                    Bracket / Finale
+                  </p>
+                  {pendingGrouped.bracket.map((m) => {
+                    const isSelected = resultMatchId === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setResultMatchId(isSelected ? "" : m.id);
+                          if (!isSelected) setResultWinner("TEAM_A");
+                        }}
+                        className={cn(
+                          "w-full text-left rounded-md px-2 py-1.5 text-xs transition-colors flex items-center gap-1.5",
+                          isSelected
+                            ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
+                            : "hover:bg-[var(--color-surface-1)] text-[var(--color-cream)]"
+                        )}
+                      >
+                        <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB.name}</span>
+                        {m.label && !m.label.includes(" vs ") && (
+                          <span className="shrink-0 text-[9px] text-[var(--color-muted)]">{m.label}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {resultMatchId && (() => {
               const m = pendingMatches.find((x) => x.id === resultMatchId);

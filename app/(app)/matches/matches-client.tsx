@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { BetForm } from "./[id]/bet-form";
 import { ChevronRight, ChevronDown, CalendarDays, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, dayKey, dayLabel, formatKickoffTime } from "@/lib/utils";
 import { getOddsForTeam, getOddsForDraw } from "@/lib/odds";
 import type { MatchPhase, BracketSource } from "@/lib/generated/prisma";
 
@@ -53,20 +53,6 @@ interface Props {
 
 // ── Constantes ─────────────────────────────────────────────────────────────
 
-const PHASE_ORDER = ["POOL", "WINNER_BRACKET", "LOSER_BRACKET", "FINAL_SERIES"] as const;
-
-const PHASE_LABEL: Record<string, string> = {
-  POOL: "Phase de poules",
-  WINNER_BRACKET: "Winner Bracket",
-  LOSER_BRACKET: "Loser Bracket",
-  FINAL_SERIES: "Finale (BO3)",
-};
-
-const SOURCE_LABEL: Record<string, string> = {
-  POOL: "Poule",
-  WINNER_BRACKET: "Winner",
-  LOSER_BRACKET: "Loser",
-};
 
 // Helpers couleur de poule (hex depuis la DB)
 function poolBadgeStyle(color: string) {
@@ -78,21 +64,21 @@ function poolBorderStyle(color: string) {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function formatDate(d: Date | string | null) {
-  if (!d) return null;
-  return new Date(d).toLocaleDateString("fr-FR", {
-    weekday: "short", day: "numeric", month: "short",
-    hour: "2-digit", minute: "2-digit",
-  });
-}
 
-function groupByPhase(list: MatchForList[]) {
-  const map = new Map<string, MatchForList[]>();
-  for (const m of list) {
-    if (!map.has(m.phase)) map.set(m.phase, []);
-    map.get(m.phase)!.push(m);
+function groupByDay(list: MatchForList[]) {
+  const sorted = [...list].sort((a, b) => {
+    if (!a.scheduledAt && !b.scheduledAt) return 0;
+    if (!a.scheduledAt) return 1;
+    if (!b.scheduledAt) return -1;
+    return new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime();
+  });
+  const groups = new Map<string, MatchForList[]>();
+  for (const m of sorted) {
+    const key = m.scheduledAt ? dayKey(m.scheduledAt) : "__no_date__";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(m);
   }
-  return map;
+  return [...groups.entries()];
 }
 
 // ── Sous-composant : logo d'équipe ─────────────────────────────────────────
@@ -134,16 +120,16 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
       .sort((a, b) => a.name.localeCompare(b.name, "fr"));
   }, [upcoming, finished]);
 
-  const upcomingByPhase = groupByPhase(upcoming);
-  const finishedByPhase = groupByPhase(finished);
+  const upcomingByDay = groupByDay(upcoming);
+  const finishedByDay = groupByDay(finished);
 
   function toggle(matchId: string) {
     setExpandedId((prev) => (prev === matchId ? null : matchId));
   }
 
-  function filterByPool(matches: MatchForList[]) {
+  function filterForDisplay(matches: MatchForList[]) {
     if (!selectedPool) return matches;
-    return matches.filter((m) => m.teamA.pool?.id === selectedPool);
+    return matches.filter((m) => m.phase !== "POOL" || m.teamA.pool?.id === selectedPool);
   }
 
   // ── Filtre poules ─────────────────────────────────────────────────────────
@@ -251,12 +237,12 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
                   </div>
                 </div>
 
-                {/* Centre VS + date */}
+                {/* Centre VS + heure */}
                 <div className="shrink-0 text-center px-1 w-16">
                   <p className="text-[11px] font-black text-[var(--color-muted)]">VS</p>
                   {match.scheduledAt && (
                     <p className="text-[8px] text-[var(--color-muted)] leading-tight mt-0.5">
-                      {formatDate(match.scheduledAt)}
+                      {formatKickoffTime(match.scheduledAt)}
                     </p>
                   )}
                 </div>
@@ -384,19 +370,25 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
 
           {PoolFilter}
 
-          {PHASE_ORDER.map((phase) => {
-            const raw = upcomingByPhase.get(phase);
-            if (!raw?.length) return null;
-            const phaseMatches = phase === "POOL" ? filterByPool(raw) : raw;
-            if (!phaseMatches.length) return null;
-
+          {upcomingByDay.map(([dayKeyStr, dayMatches]) => {
+            const filtered = filterForDisplay(dayMatches);
+            if (!filtered.length) return null;
             return (
-              <div key={phase}>
-                <h3 className="mb-2 text-xs font-semibold text-[var(--color-accent)] uppercase tracking-widest">
-                  {PHASE_LABEL[phase]}
-                </h3>
+              <div key={dayKeyStr}>
+                <div className="sticky top-0 z-20 -mx-4 mb-3 px-4 py-2 backdrop-blur-xl bg-[var(--color-bg)]/80">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-4 w-0.5 rounded-full bg-[var(--color-accent)]" />
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--color-cream)]">
+                      {dayKeyStr === "__no_date__" ? "Non programmé" : dayLabel(dayMatches[0]!.scheduledAt!)}
+                    </h3>
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-muted)]">
+                      {filtered.length} match{filtered.length > 1 ? "s" : ""}
+                    </span>
+                    <div className="h-px flex-1 bg-gradient-to-r from-[var(--color-border-subtle)] to-transparent" />
+                  </div>
+                </div>
                 <div className="space-y-2">
-                  {phaseMatches.map((match) => <UpcomingCard key={match.id} match={match} />)}
+                  {filtered.map((match) => <UpcomingCard key={match.id} match={match} />)}
                 </div>
               </div>
             );
@@ -417,21 +409,25 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
             <CheckCircle2 className="size-4" /> Résultats
           </h2>
 
-          {pools.length > 1 && PoolFilter}
+          {PoolFilter}
 
-          {PHASE_ORDER.map((phase) => {
-            const raw = finishedByPhase.get(phase);
-            if (!raw?.length) return null;
-            const phaseMatches = phase === "POOL" ? filterByPool(raw) : raw;
-            if (!phaseMatches.length) return null;
-
+          {finishedByDay.map(([dayKeyStr, dayMatches]) => {
+            const filtered = filterForDisplay(dayMatches);
+            if (!filtered.length) return null;
             return (
-              <div key={phase}>
-                <h3 className="mb-2 text-xs font-semibold text-[var(--color-muted)] uppercase tracking-widest">
-                  {PHASE_LABEL[phase]}
-                </h3>
+              <div key={dayKeyStr} className="space-y-2">
+                <div className="flex items-center gap-2.5 mb-2">
+                  <div className="h-4 w-0.5 rounded-full bg-[var(--color-muted)]" />
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--color-muted)]">
+                    {dayKeyStr === "__no_date__" ? "Non programmé" : dayLabel(dayMatches[0]!.scheduledAt!)}
+                  </h3>
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-muted)] opacity-60">
+                    {filtered.length} match{filtered.length > 1 ? "s" : ""}
+                  </span>
+                  <div className="h-px flex-1 bg-gradient-to-r from-[var(--color-border-subtle)] to-transparent" />
+                </div>
                 <div className="space-y-2">
-                  {phaseMatches.map((match) => <FinishedCard key={match.id} match={match} />)}
+                  {filtered.map((match) => <FinishedCard key={match.id} match={match} />)}
                 </div>
               </div>
             );

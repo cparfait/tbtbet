@@ -218,7 +218,7 @@ export async function getAllChampionBets() {
 // ─────────────────────────────────────────────
 
 export async function getLeaderboard() {
-  return prisma.user.findMany({
+  const users = await prisma.user.findMany({
     where: { banned: false },
     select: {
       id: true,
@@ -226,9 +226,46 @@ export async function getLeaderboard() {
       avatarUrl: true,
       wizzBalance: true,
       jokersLeft: true,
+      previousWizzRank: true,
     },
     orderBy: { wizzBalance: "desc" },
   });
+
+  // Calcule l'évolution : précédent rang - rang actuel
+  // > 0 = a grimpé, < 0 = a baissé, 0 = stable, null = première fois
+  return users.map((u, i) => {
+    const currentRank = i + 1;
+    const evolution =
+      u.previousWizzRank != null
+        ? u.previousWizzRank - currentRank
+        : null;
+    return {
+      id: u.id,
+      name: u.name,
+      avatarUrl: u.avatarUrl,
+      wizzBalance: u.wizzBalance,
+      jokersLeft: u.jokersLeft,
+      evolution,
+    };
+  });
+}
+
+/** Snapshot les rangs actuels du classement (à appeler après règlement des paris). */
+export async function snapshotRanks() {
+  const users = await prisma.user.findMany({
+    where: { banned: false },
+    orderBy: { wizzBalance: "desc" },
+    select: { id: true },
+  });
+
+  await Promise.all(
+    users.map((u, i) =>
+      prisma.user.update({
+        where: { id: u.id },
+        data: { previousWizzRank: i + 1 },
+      })
+    )
+  );
 }
 
 // ─────────────────────────────────────────────
