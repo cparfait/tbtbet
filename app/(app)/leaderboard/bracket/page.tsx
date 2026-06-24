@@ -165,7 +165,7 @@ export default async function BracketPage() {
               {lbRounds.map(([round, rMatches]) => (
                 <div key={round} className="flex-none w-44">
                   <p className="text-[10px] uppercase tracking-wider text-[var(--color-muted)] mb-2 text-center">
-                    LB Tour {round}
+                    Tour {round}
                   </p>
                   <div className="space-y-2">
                     {rMatches.map((m) => <MatchCard key={m.id} match={m} />)}

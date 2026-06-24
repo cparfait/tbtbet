@@ -919,12 +919,6 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                               : "text-[var(--color-cream)] hover:bg-[var(--color-surface-1)]"
                           )}
                         >
-                          <span
-                            className="shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold"
-                            style={pool ? { background: pool.color + "30", color: pool.color } : undefined}
-                          >
-                            {pool?.name ?? "?"}
-                          </span>
                           <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB?.name ?? "À déterminer"}</span>
                           {isDone && (
                             <span className="shrink-0 text-[10px] text-green-400 font-bold">✓ {m.scoreA}-{m.scoreB}</span>
