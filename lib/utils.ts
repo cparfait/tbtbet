@@ -62,8 +62,8 @@ export function formatMatchLabel(label: string | null | undefined): string {
   if (!label) return "";
   const s = (label.split(" — ")[0] ?? label).trim();
   return s
-    .replace(/^WB\s+R(\d+)$/i, "R$1")      // "WB R1" → "R1"
-    .replace(/^LB\s+R(\d+)$/i, "R$1")      // "LB R1" → "R1"
+    .replace(/^WB\s+R(\d+)$/i, "Tour $1")   // "WB R1" → "Tour 1"
+    .replace(/^LB\s+R(\d+)$/i, "Tour $1")  // "LB R1" → "Tour 1"
     .replace(/^(?:WB|LB)\s+/i, "")         // "WB Tour 1 · M2" → "Tour 1 · M2"
     .replace(/^Finale\s*[·\-]\s*/i, "")    // "Finale · Match 1" → "Match 1"
     .replace(/^Poule\s+\S+\s*([·\-]\s*)?/i, "") // "Poule A" ou "Poule A · …" → "" ou "…"
