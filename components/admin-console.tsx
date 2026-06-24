@@ -44,7 +44,7 @@ interface Match {
   label: string;
   phase: string;
   teamA: Team;
-  teamB: Team;
+  teamB: Team | null;
   teamASource: string;
   teamBSource: string;
   status: string;
@@ -234,6 +234,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
       ok(`${res.created} match${res.created !== 1 ? "s" : ""} de poules générés.`);
     } catch (e) { err(e); }
   }
+
 
   async function handleCreateMatch() {
     if (!matchTeamAId || !matchTeamBId || matchTeamAId === matchTeamBId) {
@@ -668,6 +669,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
             </div>
           </Card>
 
+
           {/* Matchs de poules sans date → admin met la date */}
           {poolMatches.length > 0 && (
             <div>
@@ -681,7 +683,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-medium truncate">{match.label}</p>
                         <p className="text-[10px] text-[var(--color-muted)]">
-                          {match.teamA.name} vs {match.teamB.name}
+                          {match.teamA.name} vs {match.teamB?.name ?? "À déterminer"}
                         </p>
                         {match.scheduledAt ? (
                           <p className="text-[10px] text-green-400">{formatDate(match.scheduledAt)}</p>
@@ -780,7 +782,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                         {match.label} · <span className="text-[var(--color-muted)]">{match.phase}</span>
                       </p>
                       <p className="text-[10px] text-[var(--color-muted)]">
-                        {match.teamA.name} vs {match.teamB.name}
+                        {match.teamA.name} vs {match.teamB?.name ?? "À déterminer"}
                       </p>
                       {match.status === "FINISHED" && (
                         <p className="text-[10px] text-green-400">{match.scoreA} - {match.scoreB}</p>
@@ -818,7 +820,14 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                     {dayLabel(dayMatches[0]!.scheduledAt!)}
                   </p>
                   {dayMatches.map((m) => {
-                    const pool = m.teamA.poolId ? matchesGrouped.poolMap.get(m.teamA.poolId) : null;
+                    const pool = m.phase === "POOL" && m.teamA.poolId
+                      ? matchesGrouped.poolMap.get(m.teamA.poolId)
+                      : null;
+                    const phaseBadge =
+                      m.phase === "WINNER_BRACKET" ? { label: "WB", color: "#F5C400" } :
+                      m.phase === "LOSER_BRACKET"  ? { label: "LB", color: "#F97316" } :
+                      m.phase === "FINAL_SERIES"   ? { label: "Finale", color: "#A78BFA" } :
+                      null;
                     const isSelected = resultMatchId === m.id;
                     const isDone = m.status === "FINISHED";
                     return (
@@ -852,7 +861,15 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                             {pool.name}
                           </span>
                         )}
-                        <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB.name}</span>
+                        {phaseBadge && (
+                          <span
+                            className="shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold"
+                            style={{ background: phaseBadge.color + "30", color: phaseBadge.color }}
+                          >
+                            {phaseBadge.label}
+                          </span>
+                        )}
+                        <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB?.name ?? "À déterminer"}</span>
                         {isDone ? (
                           <span className="shrink-0 text-[10px] text-green-400 font-bold">✓ {m.scoreA}-{m.scoreB}</span>
                         ) : (
@@ -908,7 +925,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                           >
                             {pool?.name ?? "?"}
                           </span>
-                          <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB.name}</span>
+                          <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB?.name ?? "À déterminer"}</span>
                           {isDone && (
                             <span className="shrink-0 text-[10px] text-green-400 font-bold">✓ {m.scoreA}-{m.scoreB}</span>
                           )}
@@ -951,7 +968,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                             : "text-[var(--color-cream)] hover:bg-[var(--color-surface-1)]"
                         )}
                       >
-                        <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB.name}</span>
+                        <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB?.name ?? "À déterminer"}</span>
                         {isDone ? (
                           <span className="shrink-0 text-[10px] text-green-400 font-bold">✓ {m.scoreA}-{m.scoreB}</span>
                         ) : m.label && !m.label.includes(" vs ") ? (
@@ -975,7 +992,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                     <span className="text-sm text-[var(--color-muted)]">-</span>
                     <input type="number" min={0} value={resultScoreB} onChange={(e) => setResultScoreB(Number(e.target.value))}
                       className="w-14 rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2 py-1 text-center text-sm" />
-                    <span className="text-xs font-medium flex-1 text-center">{m.teamB.name}</span>
+                    <span className="text-xs font-medium flex-1 text-center">{m.teamB?.name ?? "?"}</span>
                   </div>
                   <div className={`flex gap-2`}>
                     {resultChoices.map((r) => (
@@ -986,7 +1003,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                             ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
                             : "border-[var(--color-border-subtle)] text-[var(--color-muted)]"
                         )}>
-                        {r === "TEAM_A" ? `✓ ${m.teamA.name}` : r === "TEAM_B" ? `✓ ${m.teamB.name}` : "Égalité"}
+                        {r === "TEAM_A" ? `✓ ${m.teamA.name}` : r === "TEAM_B" ? `✓ ${m.teamB?.name ?? "?"}` : "Égalité"}
                       </button>
                     ))}
                   </div>
@@ -1012,7 +1029,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                     <span className="text-[var(--color-muted)]">{m.label}</span>
                     <span className="font-bold">{m.scoreA} - {m.scoreB}</span>
                   </div>
-                  <p className="text-[10px] text-[var(--color-muted)]">{m.teamA.name} vs {m.teamB.name}</p>
+                  <p className="text-[10px] text-[var(--color-muted)]">{m.teamA.name} vs {m.teamB?.name ?? "À déterminer"}</p>
                 </Card>
               ))}
             </div>

@@ -48,7 +48,7 @@ export default async function MatchDetailPage({
     : [null, []];
 
   const oddsA = getOddsForTeam(match.phase, match.teamASource, match.teamBSource, match.teamA.wins);
-  const oddsB = getOddsForTeam(match.phase, match.teamBSource, match.teamASource, match.teamB.wins);
+  const oddsB = getOddsForTeam(match.phase, match.teamBSource, match.teamASource, match.teamB?.wins ?? 0);
   const oddsDraw = getOddsForDraw();
   const allowDraw = match.phase === "POOL";
 
@@ -171,7 +171,7 @@ export default async function MatchDetailPage({
 
             {/* Équipe B */}
             <div className="flex-1 flex flex-col items-center gap-2 text-center">
-              <TeamLogo url={match.teamB.logoUrl} name={match.teamB.name} poolColor={match.teamB.pool?.color} className="size-14 rounded-xl" />
+              <TeamLogo url={match.teamB?.logoUrl} name={match.teamB?.name ?? "?"} poolColor={match.teamB?.pool?.color} className="size-14 rounded-xl" />
               <div>
                 <p
                   className={`font-bold text-base leading-tight ${
@@ -180,7 +180,7 @@ export default async function MatchDetailPage({
                       : "text-[var(--color-cream)]"
                   }`}
                 >
-                  {match.teamB.name}
+                  {match.teamB?.name ?? "À déterminer"}
                 </p>
                 <p className="text-[10px] text-[var(--color-muted)] mt-0.5">
                   {SOURCE_LABEL[match.teamBSource]}
@@ -202,8 +202,8 @@ export default async function MatchDetailPage({
           matchId={match.id}
           teamA={match.teamA.name}
           teamALogo={match.teamA.logoUrl ?? null}
-          teamB={match.teamB.name}
-          teamBLogo={match.teamB.logoUrl ?? null}
+          teamB={match.teamB?.name ?? "?"}
+          teamBLogo={match.teamB?.logoUrl ?? null}
           oddsA={oddsA}
           oddsB={oddsB}
           oddsDraw={oddsDraw}
@@ -234,7 +234,7 @@ export default async function MatchDetailPage({
                 {existingBet.choice === "TEAM_A"
                   ? match.teamA.name
                   : existingBet.choice === "TEAM_B"
-                  ? match.teamB.name
+                  ? (match.teamB?.name ?? "?")
                   : "Égalité"}
                 {existingBet.jokerUsed && (
                   <span className="ml-2 text-xs text-[var(--color-muted)]">
@@ -313,7 +313,7 @@ export default async function MatchDetailPage({
               </thead>
               <tbody>
                 {poolData.standings.map((row, i) => {
-                  const isCurrent = row.team.id === match.teamA.id || row.team.id === match.teamB.id;
+                  const isCurrent = row.team.id === match.teamA.id || row.team.id === (match.teamBId ?? "");
                   const anyPlayed = poolMatches.some(pm => pm.status === "FINISHED");
                   const rank = poolRankLabel(i, anyPlayed);
                   return (
@@ -378,9 +378,9 @@ export default async function MatchDetailPage({
                     {/* Team B */}
                     <div className="flex flex-1 items-center gap-1.5 justify-end min-w-0">
                       <span className={`font-semibold truncate text-right ${pm.result === "TEAM_B" ? "text-green-400" : ""}`}>
-                        {pm.teamB.name}
+                        {pm.teamB?.name ?? "?"}
                       </span>
-                      <TeamLogo url={pm.teamB.logoUrl} name={pm.teamB.name} poolColor={poolData.pool.color} className="size-5 rounded" />
+                      <TeamLogo url={pm.teamB?.logoUrl} name={pm.teamB?.name ?? "?"} poolColor={poolData.pool.color} className="size-5 rounded" />
                     </div>
                   </div>
                 </Link>

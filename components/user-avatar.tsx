@@ -32,7 +32,7 @@ export function UserAvatar({ src, name, className }: UserAvatarProps) {
         className
       )}
     >
-      <span style={{ fontSize: "38%" }}>{initials}</span>
+      <span style={{ fontSize: "52%" }}>{initials}</span>
     </span>
   );
 }

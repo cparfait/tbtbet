@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calculatePayout } from "@/lib/odds";
+import { advanceBracket, tryAutoGenerateBracketR1 } from "@/lib/bracket-advance";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -154,6 +155,14 @@ export async function PATCH(req: NextRequest) {
       await tx.team.update({ where: { id: loserId }, data: { losses: { increment: 1 } } });
     } else if (match.phase === "LOSER_BRACKET" && loserId) {
       await tx.team.update({ where: { id: loserId }, data: { losses: { increment: 1 }, eliminated: true } });
+    }
+
+    // Avancement automatique du bracket (WB/LB uniquement, pas les corrections)
+    await advanceBracket(id, tx, isCorrection);
+
+    // Génération automatique du R1 bracket après le dernier match de poule
+    if (match.phase === "POOL" && !isCorrection) {
+      await tryAutoGenerateBracketR1(tx);
     }
 
     // Gestion FinalSeries BO3 (uniquement pour un nouveau résultat, pas une correction)

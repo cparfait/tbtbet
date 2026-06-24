@@ -175,7 +175,7 @@ export default async function DashboardPage() {
                 nextMatch.phase,
                 nextMatch.teamBSource,
                 nextMatch.teamASource,
-                nextMatch.teamB.wins
+                nextMatch.teamB?.wins ?? 0
               );
               return (
                 <Link href={`/matches/${nextMatch.id}`}>
@@ -231,7 +231,7 @@ export default async function DashboardPage() {
 
                       {/* Équipe B */}
                       <div className="flex-1 text-center">
-                        {nextMatch.teamB.logoUrl ? (
+                        {nextMatch.teamB?.logoUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={nextMatch.teamB.logoUrl}
@@ -242,7 +242,7 @@ export default async function DashboardPage() {
                           <div className="size-10 rounded-lg bg-[var(--color-surface-2)] mx-auto mb-1.5" />
                         )}
                         <p className="text-sm font-bold truncate">
-                          {nextMatch.teamB.name}
+                          {nextMatch.teamB?.name ?? "À déterminer"}
                         </p>
                         <p className="text-[10px] text-[var(--color-muted)]">
                           {SOURCE_LABEL[nextMatch.teamBSource]}

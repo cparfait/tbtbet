@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     } else if (choice === "TEAM_A") {
       oddsApplied = getOddsForTeam(match.phase, match.teamASource, match.teamBSource, match.teamA.wins);
     } else {
-      oddsApplied = getOddsForTeam(match.phase, match.teamBSource, match.teamASource, match.teamB.wins);
+      oddsApplied = getOddsForTeam(match.phase, match.teamBSource, match.teamASource, match.teamB?.wins ?? 0);
     }
 
     const existingBet = await prisma.bet.findUnique({

@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
-import { getAllTeams, getUserChampionBet } from "@/lib/data/queries";
+import { getAllTeams, getUserChampionBet, getChampionBetsByTeam } from "@/lib/data/queries";
 import { ChampionBetForm } from "./champion-bet-form";
+import { ChampionBetsList } from "./champion-bets-list";
 import { Star, Lock } from "lucide-react";
 import { TeamLogo } from "@/components/team-logo";
 
@@ -14,9 +15,10 @@ export default async function ChampionBetPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const [teams, existingBet] = await Promise.all([
+  const [teams, existingBet, betsByTeam] = await Promise.all([
     getAllTeams(),
     getUserChampionBet(session.user.id),
+    getChampionBetsByTeam(),
   ]);
 
   return (
@@ -28,22 +30,26 @@ export default async function ChampionBetPage() {
 
       {existingBet ? (
         /* ── Choix verrouillé ── */
-        <Card className="p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <Lock className="size-4 text-[var(--color-muted)]" />
-            <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-semibold">
-              Choix définitif · verrouillé
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <TeamLogo url={existingBet.team.logoUrl} name={existingBet.team.name} className="size-16 rounded-xl" />
-            <div>
-              <p className="text-[10px] text-[var(--color-muted)]">Ton équipe favorite</p>
-              <p className="text-2xl font-black">{existingBet.team.name}</p>
+        <>
+          <Card className="p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <Lock className="size-4 text-[var(--color-muted)]" />
+              <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-semibold">
+                Choix définitif · verrouillé
+              </p>
             </div>
-          </div>
-        </Card>
+
+            <div className="flex items-center gap-4">
+              <TeamLogo url={existingBet.team.logoUrl} name={existingBet.team.name} className="size-16 rounded-xl" />
+              <div>
+                <p className="text-[10px] text-[var(--color-muted)]">Ton équipe favorite</p>
+                <p className="text-2xl font-black">{existingBet.team.name}</p>
+              </div>
+            </div>
+          </Card>
+
+          <ChampionBetsList teams={betsByTeam} />
+        </>
       ) : (
         /* ── Formulaire de choix ── */
         <Card className="p-4">

@@ -210,9 +210,9 @@ export default async function PlayerPage({
                         match.result === "TEAM_B" ? "text-[var(--color-accent)]" : "text-[var(--color-cream)]"
                       )}
                     >
-                      {match.teamB.name}
+                      {match.teamB?.name ?? "?"}
                     </span>
-                    <TeamLogo url={match.teamB.logoUrl} name={match.teamB.name} className="size-4 rounded" />
+                    <TeamLogo url={match.teamB?.logoUrl} name={match.teamB?.name ?? "?"} className="size-4 rounded" />
                   </div>
                 </div>
 
@@ -223,7 +223,7 @@ export default async function PlayerPage({
                       <BetBadge
                         choice={myBet.choice as BetChoice}
                         teamAName={match.teamA.name}
-                        teamBName={match.teamB.name}
+                        teamBName={match.teamB?.name ?? "?"}
                         payout={myBet.payout}
                         amountWizz={myBet.amountWizz}
                         jokerUsed={myBet.jokerUsed}
@@ -246,7 +246,7 @@ export default async function PlayerPage({
                       <BetBadge
                         choice={theirBet.choice as BetChoice}
                         teamAName={match.teamA.name}
-                        teamBName={match.teamB.name}
+                        teamBName={match.teamB?.name ?? "?"}
                         payout={theirBet.payout}
                         amountWizz={theirBet.amountWizz}
                         jokerUsed={theirBet.jokerUsed}

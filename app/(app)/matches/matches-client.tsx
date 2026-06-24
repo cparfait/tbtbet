@@ -25,7 +25,7 @@ export interface MatchForList {
   teamASource: BracketSource;
   teamBSource: BracketSource;
   teamA: MatchTeam;
-  teamB: MatchTeam;
+  teamB: MatchTeam | null;
   label: string | null;
   status: string;
   scoreA: number | null;
@@ -159,12 +159,12 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
   // ── Carte match à venir ───────────────────────────────────────────────────
   function UpcomingCard({ match }: { match: MatchForList }) {
     const oddsA = getOddsForTeam(match.phase, match.teamASource, match.teamBSource, match.teamA.wins);
-    const oddsB = getOddsForTeam(match.phase, match.teamBSource, match.teamASource, match.teamB.wins);
+    const oddsB = getOddsForTeam(match.phase, match.teamBSource, match.teamASource, match.teamB?.wins ?? 0);
     const oddsDraw = getOddsForDraw();
     const allowDraw = match.phase === "POOL";
     const bet = betMap[match.id];
     const betChoice = bet?.choice === "TEAM_A" ? match.teamA.name
-      : bet?.choice === "TEAM_B" ? match.teamB.name
+      : bet?.choice === "TEAM_B" ? (match.teamB?.name ?? "?")
       : bet?.choice === "DRAW" ? "Égalité" : null;
     const isClosed = match.bettingClosesAt != null && new Date(match.bettingClosesAt) <= new Date();
     const canBet = !isClosed;
@@ -244,10 +244,10 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
                 {/* Team B */}
                 <div className="flex-1 flex items-center gap-2 justify-end min-w-0">
                   <div className="min-w-0 text-right">
-                    <p className="text-sm font-semibold truncate leading-tight">{match.teamB.name}</p>
+                    <p className="text-sm font-semibold truncate leading-tight">{match.teamB?.name ?? "À déterminer"}</p>
                     <p className="text-[10px] font-bold text-[var(--color-accent)]">×{oddsB}</p>
                   </div>
-                  <TeamLogo url={match.teamB.logoUrl} name={match.teamB.name} poolColor={match.teamB.pool?.color} className="size-9 rounded-lg" />
+                  <TeamLogo url={match.teamB?.logoUrl} name={match.teamB?.name ?? "?"} poolColor={match.teamB?.pool?.color} className="size-9 rounded-lg" />
                 </div>
               </div>
             )}
@@ -261,8 +261,8 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
               matchId={match.id}
               teamA={match.teamA.name}
               teamALogo={match.teamA.logoUrl}
-              teamB={match.teamB.name}
-              teamBLogo={match.teamB.logoUrl}
+              teamB={match.teamB?.name ?? "?"}
+              teamBLogo={match.teamB?.logoUrl ?? null}
               oddsA={oddsA}
               oddsB={oddsB}
               oddsDraw={oddsDraw}
@@ -337,9 +337,9 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
                 "text-sm font-semibold truncate text-right",
                 match.result === "TEAM_B" ? "text-[var(--color-accent)]" : "text-[var(--color-cream)]"
               )}>
-                {match.teamB.name}
+                {match.teamB?.name ?? "?"}
               </span>
-              <TeamLogo url={match.teamB.logoUrl} name={match.teamB.name} poolColor={match.teamB.pool?.color} className="size-7 rounded-md" />
+              <TeamLogo url={match.teamB?.logoUrl} name={match.teamB?.name ?? "?"} poolColor={match.teamB?.pool?.color} className="size-7 rounded-md" />
             </div>
           </div>
 

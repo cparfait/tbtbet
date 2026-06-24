@@ -227,6 +227,27 @@ export async function getAllChampionBets() {
   });
 }
 
+export async function getChampionBetsByTeam() {
+  const teams = await prisma.team.findMany({
+    include: {
+      championBets: {
+        include: {
+          user: { select: { id: true, name: true, avatarUrl: true } },
+        },
+      },
+    },
+  });
+  return teams
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      logoUrl: t.logoUrl,
+      players: t.championBets.map((b) => b.user),
+      count: t.championBets.length,
+    }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
 // ─────────────────────────────────────────────
 // Classement
 // ─────────────────────────────────────────────

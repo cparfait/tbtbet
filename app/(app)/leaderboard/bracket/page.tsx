@@ -44,6 +44,20 @@ export default async function BracketPage() {
   const wbRounds = groupByRound(wbMatches);
   const lbRounds = groupByRound(lbMatches);
 
+  // V/D uniquement sur les matchs de bracket (pas les poules)
+  function bracketStats(teamId: string) {
+    let wins = 0, losses = 0;
+    for (const m of [...wbMatches, ...lbMatches]) {
+      if (m.status !== "FINISHED") continue;
+      if (m.teamAId === teamId) {
+        m.result === "TEAM_A" ? wins++ : losses++;
+      } else if (m.teamBId === teamId) {
+        m.result === "TEAM_B" ? wins++ : losses++;
+      }
+    }
+    return { wins, losses };
+  }
+
   const statusLabel = (status: string) => {
     if (status === "FINISHED") return { text: "Terminé", cls: "text-[var(--color-muted)]" };
     if (status === "LIVE") return { text: "LIVE", cls: "text-red-400" };
@@ -64,6 +78,7 @@ export default async function BracketPage() {
   function MatchCard({ match }: { match: any }) {
     const { text, cls } = statusLabel(match.status);
     const isFinished = match.status === "FINISHED";
+    const hasTBD = !match.teamBId;
     return (
       <Link href={`/matches/${match.id}`}>
         <Card className="p-2.5 hover:border-[var(--color-accent)]/30 transition-colors min-w-[160px]">
@@ -71,23 +86,31 @@ export default async function BracketPage() {
           <div className="mt-1 space-y-1">
             <div className={`flex items-center justify-between gap-2 ${isFinished && match.result === "TEAM_A" ? "text-[var(--color-accent)]" : ""}`}>
               <div className="flex items-center gap-1.5 min-w-0">
-                <TeamLogo url={match.teamA.logoUrl} name={match.teamA.name} className="size-4 rounded" />
-                <span className="text-xs font-medium truncate">{match.teamA.name}</span>
+                <TeamLogo url={match.teamA?.logoUrl} name={match.teamA?.name ?? "?"} className="size-4 rounded" />
+                <span className="text-xs font-medium truncate">{match.teamA?.name ?? "?"}</span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <WLBadge wins={match.teamA.wins} losses={match.teamA.losses} />
+                <WLBadge {...bracketStats(match.teamAId)} />
                 {isFinished && <span className="text-xs font-bold">{match.scoreA}</span>}
               </div>
             </div>
             <div className={`flex items-center justify-between gap-2 ${isFinished && match.result === "TEAM_B" ? "text-[var(--color-accent)]" : ""}`}>
               <div className="flex items-center gap-1.5 min-w-0">
-                <TeamLogo url={match.teamB.logoUrl} name={match.teamB.name} className="size-4 rounded" />
-                <span className="text-xs font-medium truncate">{match.teamB.name}</span>
+                {hasTBD ? (
+                  <span className="text-[10px] italic text-[var(--color-muted)]">À déterminer…</span>
+                ) : (
+                  <>
+                    <TeamLogo url={match.teamB?.logoUrl} name={match.teamB?.name ?? "?"} className="size-4 rounded" />
+                    <span className="text-xs font-medium truncate">{match.teamB?.name}</span>
+                  </>
+                )}
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <WLBadge wins={match.teamB.wins} losses={match.teamB.losses} />
-                {isFinished && <span className="text-xs font-bold">{match.scoreB}</span>}
-              </div>
+              {!hasTBD && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <WLBadge {...bracketStats(match.teamBId)} />
+                  {isFinished && <span className="text-xs font-bold">{match.scoreB}</span>}
+                </div>
+              )}
             </div>
           </div>
         </Card>
@@ -202,7 +225,7 @@ export default async function BracketPage() {
                           <span className="text-xs text-[var(--color-muted)]">vs</span>
                         )}
                         <span className={`text-sm font-medium ${m.result === "TEAM_B" ? "text-[var(--color-accent)]" : ""}`}>
-                          {m.teamB.name}
+                          {m.teamB?.name ?? "?"}
                         </span>
                       </div>
                     </Card>

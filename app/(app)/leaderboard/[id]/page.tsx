@@ -117,7 +117,7 @@ export default async function PoolStandingsPage({
                         {m.scoreA}&nbsp;–&nbsp;{m.scoreB}
                       </span>
                       <span className={`flex-1 text-sm font-semibold text-right truncate ${m.result === "TEAM_B" ? "text-green-400" : ""}`}>
-                        {m.teamB.name}
+                        {m.teamB?.name ?? "À déterminer"}
                       </span>
                     </div>
                   ) : (
@@ -135,7 +135,7 @@ export default async function PoolStandingsPage({
                           </p>
                         )}
                       </div>
-                      <span className="flex-1 text-sm font-medium text-right truncate">{m.teamB.name}</span>
+                      <span className="flex-1 text-sm font-medium text-right truncate">{m.teamB?.name ?? "À déterminer"}</span>
                     </div>
                   )}
                 </Card>

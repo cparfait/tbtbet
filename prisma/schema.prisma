@@ -109,10 +109,10 @@ model Match {
   round           Int?
   teamAId         String
   teamA           Team          @relation("TeamA", fields: [teamAId], references: [id])
-  teamASource     BracketSource // d'où vient teamA POUR CE MATCH (détermine sa cote)
-  teamBId         String
-  teamB           Team          @relation("TeamB", fields: [teamBId], references: [id])
-  teamBSource     BracketSource
+  teamASource     BracketSource @default(POOL)
+  teamBId         String?       // null = slot TBD (adversaire pas encore connu)
+  teamB           Team?         @relation("TeamB", fields: [teamBId], references: [id])
+  teamBSource     BracketSource @default(POOL)
   scheduledAt     DateTime?
   bettingClosesAt DateTime?
   status          MatchStatus   @default(SCHEDULED)
