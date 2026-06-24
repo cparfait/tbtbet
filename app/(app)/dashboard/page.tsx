@@ -74,7 +74,17 @@ export default async function DashboardPage() {
     return new Date(m.scheduledAt) > todayEnd;
   }).length;
 
-  const nextMatch = todayMatches.length === 0 ? (matches[0] ?? null) : null;
+  const upcomingMatches = (() => {
+    if (todayMatches.length > 0 || matches.length === 0) return [];
+    const firstDate = new Date(matches[0].scheduledAt!);
+    const dayStart = new Date(firstDate.getFullYear(), firstDate.getMonth(), firstDate.getDate());
+    const dayEnd = new Date(firstDate.getFullYear(), firstDate.getMonth(), firstDate.getDate(), 23, 59, 59);
+    return matches.filter((m) => {
+      if (!m.scheduledAt) return false;
+      const d = new Date(m.scheduledAt);
+      return d >= dayStart && d <= dayEnd;
+    });
+  })();
 
   const firstName = user.name?.split(" ")[0] ?? "Joueur";
 
@@ -182,16 +192,18 @@ export default async function DashboardPage() {
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
             {todayMatches.length > 0
               ? `Matchs du jour (${todayMatches.length})`
-              : "Prochain match"}
+              : upcomingMatches.length > 1
+                ? `Prochains matchs (${upcomingMatches.length})`
+                : "Prochain match"}
           </h2>
 
           {todayMatches.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {todayMatches.map((match) => {
                 const oddsA = getOddsForTeam(match.phase, match.teamASource, match.teamBSource, match.teamA.wins);
                 const oddsB = getOddsForTeam(match.phase, match.teamBSource, match.teamASource, match.teamB?.wins ?? 0);
                 return (
-                  <Link key={match.id} href={`/matches/${match.id}`}>
+                  <Link key={match.id} href={`/matches/${match.id}`} className="block">
                     <Card className="p-4 hover:border-[var(--color-accent)]/40 transition-colors">
                       <p className="text-[10px] uppercase tracking-wider text-[var(--color-muted)] mb-3">
                         {match.label}&nbsp;·&nbsp;
@@ -228,50 +240,53 @@ export default async function DashboardPage() {
                 );
               })}
             </div>
-          ) : nextMatch ? (
-            (() => {
-              const oddsA = getOddsForTeam(nextMatch.phase, nextMatch.teamASource, nextMatch.teamBSource, nextMatch.teamA.wins);
-              const oddsB = getOddsForTeam(nextMatch.phase, nextMatch.teamBSource, nextMatch.teamASource, nextMatch.teamB?.wins ?? 0);
-              return (
-                <Link href={`/matches/${nextMatch.id}`}>
-                  <Card className="p-4 hover:border-[var(--color-accent)]/40 transition-colors">
-                    <p className="text-[10px] uppercase tracking-wider text-[var(--color-muted)] mb-3">
-                      {nextMatch.label}&nbsp;·&nbsp;
-                      {PHASE_LABEL[nextMatch.phase] ?? nextMatch.phase}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 text-center">
-                        <TeamLogo url={nextMatch.teamA.logoUrl} name={nextMatch.teamA.name} className="size-10 mx-auto mb-1.5 rounded-lg" />
-                        <p className="text-sm font-bold truncate">{nextMatch.teamA.name}</p>
-                        <p className="text-[10px] text-[var(--color-muted)]">{SOURCE_LABEL[nextMatch.teamASource]}</p>
-                        <p className="text-xs font-semibold text-[var(--color-accent)] mt-0.5">x{oddsA}</p>
+          ) : upcomingMatches.length > 0 ? (
+            <div className="space-y-2">
+              {upcomingMatches.map((match) => {
+                const oddsA = getOddsForTeam(match.phase, match.teamASource, match.teamBSource, match.teamA.wins);
+                const oddsB = getOddsForTeam(match.phase, match.teamBSource, match.teamASource, match.teamB?.wins ?? 0);
+                return (
+                  <Link key={match.id} href={`/matches/${match.id}`} className="block">
+                    <Card className="p-4 hover:border-[var(--color-accent)]/40 transition-colors">
+                      <p className="text-[10px] uppercase tracking-wider text-[var(--color-muted)] mb-3">
+                        {match.label}&nbsp;·&nbsp;
+                        {PHASE_LABEL[match.phase] ?? match.phase}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 text-center">
+                          <TeamLogo url={match.teamA.logoUrl} name={match.teamA.name} className="size-10 mx-auto mb-1.5 rounded-lg" />
+                          <p className="text-sm font-bold truncate">{match.teamA.name}</p>
+                          <p className="text-[10px] text-[var(--color-muted)]">{SOURCE_LABEL[match.teamASource]}</p>
+                          <p className="text-xs font-semibold text-[var(--color-accent)] mt-0.5">x{oddsA}</p>
+                        </div>
+                        <div className="text-center shrink-0 w-16">
+                          <p className="text-sm font-bold text-[var(--color-muted)]">VS</p>
+                          {match.scheduledAt && (
+                            <p className="text-[9px] text-[var(--color-muted)] mt-1 leading-tight">
+                              {new Date(match.scheduledAt).toLocaleDateString("fr-FR", {
+                                weekday: "short", day: "numeric", month: "short",
+                              })}
+                              <br />
+                              {new Date(match.scheduledAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex-1 text-center">
+                          <TeamLogo url={match.teamB?.logoUrl ?? null} name={match.teamB?.name ?? "?"} className="size-10 mx-auto mb-1.5 rounded-lg" />
+                          <p className="text-sm font-bold truncate">{match.teamB?.name ?? "À déterminer"}</p>
+                          <p className="text-[10px] text-[var(--color-muted)]">{SOURCE_LABEL[match.teamBSource]}</p>
+                          <p className="text-xs font-semibold text-[var(--color-accent)] mt-0.5">x{oddsB}</p>
+                        </div>
                       </div>
-                      <div className="text-center shrink-0 w-16">
-                        <p className="text-sm font-bold text-[var(--color-muted)]">VS</p>
-                        {nextMatch.scheduledAt && (
-                          <p className="text-[9px] text-[var(--color-muted)] mt-1 leading-tight">
-                            {new Date(nextMatch.scheduledAt).toLocaleDateString("fr-FR", {
-                              weekday: "short", day: "numeric", month: "short",
-                              hour: "2-digit", minute: "2-digit",
-                            })}
-                          </p>
-                        )}
+                      <div className="mt-4 flex items-center justify-center gap-1 rounded-lg bg-[var(--color-accent)]/10 py-2 text-sm font-medium text-[var(--color-accent)]">
+                        Parier sur ce match
+                        <ChevronRight className="size-4" />
                       </div>
-                      <div className="flex-1 text-center">
-                        <TeamLogo url={nextMatch.teamB?.logoUrl ?? null} name={nextMatch.teamB?.name ?? "?"} className="size-10 mx-auto mb-1.5 rounded-lg" />
-                        <p className="text-sm font-bold truncate">{nextMatch.teamB?.name ?? "À déterminer"}</p>
-                        <p className="text-[10px] text-[var(--color-muted)]">{SOURCE_LABEL[nextMatch.teamBSource]}</p>
-                        <p className="text-xs font-semibold text-[var(--color-accent)] mt-0.5">x{oddsB}</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex items-center justify-center gap-1 rounded-lg bg-[var(--color-accent)]/10 py-2 text-sm font-medium text-[var(--color-accent)]">
-                      Parier sur ce match
-                      <ChevronRight className="size-4" />
-                    </div>
-                  </Card>
-                </Link>
-              );
-            })()
+                    </Card>
+                  </Link>
+                );
+              })}
+            </div>
           ) : (
             <Card className="p-6 text-center">
               <Clock className="size-8 mx-auto mb-2 text-[var(--color-muted)]" />

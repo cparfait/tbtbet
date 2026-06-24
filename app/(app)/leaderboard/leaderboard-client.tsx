@@ -123,10 +123,12 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
               )}
 
               {/* ── Classement complet ── */}
+              <div className="space-y-2">
               {leaderboard.map((user, i) => (
                 <Link
                   key={user.id}
                   href={user.id === currentUserId ? "/profile" : `/players/${user.id}`}
+                  className="block"
                 >
                   <Card
                     className={cn(
@@ -162,6 +164,7 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
                   </Card>
                 </Link>
               ))}
+              </div>
             </>
           )}
         </div>

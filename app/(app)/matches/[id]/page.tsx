@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
-import { getMatchById, getUserBetForMatch, getUserById, getPoolStandings, getPoolMatchesByPoolId } from "@/lib/data/queries";
+import { getMatchById, getUserBetForMatch, getUserById, getPoolStandings, getPoolMatchesByPoolId, getScheduledMatches, getUserBets } from "@/lib/data/queries";
 import { getOddsForTeam, getOddsForDraw } from "@/lib/odds";
 import { BetForm } from "./bet-form";
 import Link from "next/link";
@@ -29,10 +29,12 @@ export default async function MatchDetailPage({
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const [match, user, existingBet] = await Promise.all([
+  const [match, user, existingBet, scheduledMatches, userBets] = await Promise.all([
     getMatchById(id),
     getUserById(session.user.id),
     getUserBetForMatch(session.user.id, id),
+    getScheduledMatches(),
+    getUserBets(session.user.id),
   ]);
 
   if (!match) notFound();
@@ -56,6 +58,14 @@ export default async function MatchDetailPage({
     new Date(closesAt) <= new Date();
   const isOpen = !isFinished && !isClosed;
 
+  const betMatchIds = new Set(userBets.map((b) => b.matchId));
+  const nextUnbetMatch = scheduledMatches.find((m) => {
+    if (m.id === id) return false;
+    if (betMatchIds.has(m.id)) return false;
+    const closesAt = m.bettingClosesAt ?? m.scheduledAt;
+    return closesAt == null || new Date(closesAt) > new Date();
+  }) ?? null;
+
   const betWon =
     existingBet?.settled &&
     existingBet.payout != null &&
@@ -69,10 +79,10 @@ export default async function MatchDetailPage({
     <div className="space-y-4">
       {/* Retour */}
       <Link
-        href="/matches"
+        href="/"
         className="inline-flex items-center gap-1 text-sm text-[var(--color-muted)] hover:text-[var(--color-cream)]"
       >
-        <ArrowLeft className="size-4" /> Matchs
+        <ArrowLeft className="size-4" /> Accueil
       </Link>
 
       {/* ── Hero du match ── */}
@@ -200,6 +210,17 @@ export default async function MatchDetailPage({
               : null
           }
         />
+      )}
+
+      {/* ── Pari suivant ── */}
+      {nextUnbetMatch && (
+        <Link
+          href={`/matches/${nextUnbetMatch.id}`}
+          className="flex items-center justify-center gap-2 w-full rounded-2xl border-2 border-[var(--color-accent)]/40 py-3 text-sm font-bold text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 transition-all"
+        >
+          Pari suivant
+          <ChevronRight className="size-4" />
+        </Link>
       )}
 
       {/* ── Résultat du pari (match terminé) ── */}
