@@ -74,11 +74,18 @@ export default async function BracketPage() {
     );
   }
 
+  const PHASE_COLOR: Record<string, string> = {
+    WINNER_BRACKET: "#22c55e",
+    LOSER_BRACKET:  "#f97316",
+    FINAL_SERIES:   "#eab308",
+  };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function MatchCard({ match }: { match: any }) {
     const { text, cls } = statusLabel(match.status);
     const isFinished = match.status === "FINISHED";
     const hasTBD = !match.teamBId;
+    const phaseColor = PHASE_COLOR[match.phase as string];
     return (
       <Link href={`/matches/${match.id}`}>
         <Card className="p-2.5 hover:border-[var(--color-accent)]/30 transition-colors min-w-[160px]">
@@ -86,7 +93,7 @@ export default async function BracketPage() {
           <div className="mt-1 space-y-1">
             <div className={`flex items-center justify-between gap-2 ${isFinished && match.result === "TEAM_A" ? "text-[var(--color-accent)]" : ""}`}>
               <div className="flex items-center gap-1.5 min-w-0">
-                <TeamLogo url={match.teamA?.logoUrl} name={match.teamA?.name ?? "?"} className="size-4 rounded" />
+                <TeamLogo url={match.teamA?.logoUrl} name={match.teamA?.name ?? "?"} poolColor={phaseColor} className="size-4 rounded" />
                 <span className="text-xs font-medium truncate">{match.teamA?.name ?? "?"}</span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
@@ -100,7 +107,7 @@ export default async function BracketPage() {
                   <span className="text-[10px] italic text-[var(--color-muted)]">À déterminer…</span>
                 ) : (
                   <>
-                    <TeamLogo url={match.teamB?.logoUrl} name={match.teamB?.name ?? "?"} className="size-4 rounded" />
+                    <TeamLogo url={match.teamB?.logoUrl} name={match.teamB?.name ?? "?"} poolColor={phaseColor} className="size-4 rounded" />
                     <span className="text-xs font-medium truncate">{match.teamB?.name}</span>
                   </>
                 )}
