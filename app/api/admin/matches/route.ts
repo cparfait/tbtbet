@@ -90,29 +90,52 @@ export async function PATCH(req: NextRequest) {
     include: { teamA: true, teamB: true },
   });
   if (!match) return NextResponse.json({ error: "Match introuvable" }, { status: 404 });
-  if (match.status === "FINISHED") {
-    return NextResponse.json({ error: "Ce match a déjà un résultat" }, { status: 400 });
-  }
   if (result === "DRAW" && match.phase !== "POOL") {
     return NextResponse.json({ error: "Match nul impossible en phase éliminatoire" }, { status: 400 });
   }
 
-  const bets = await prisma.bet.findMany({
-    where: { matchId: id, settled: false },
-  });
+  const isCorrection = match.status === "FINISHED";
+  const allBets = await prisma.bet.findMany({ where: { matchId: id } });
 
   const winnerId = result === "TEAM_A" ? match.teamAId : result === "TEAM_B" ? match.teamBId : null;
   const loserId = result === "TEAM_A" ? match.teamBId : result === "TEAM_B" ? match.teamAId : null;
 
   try {
   await prisma.$transaction(async (tx) => {
+    // Correction : annuler les effets du résultat précédent avant de réécrire
+    if (isCorrection && match.result) {
+      const prevWinnerId = match.result === "TEAM_A" ? match.teamAId : match.result === "TEAM_B" ? match.teamBId : null;
+      const prevLoserId = match.result === "TEAM_A" ? match.teamBId : match.result === "TEAM_B" ? match.teamAId : null;
+
+      if (prevWinnerId) {
+        await tx.team.update({ where: { id: prevWinnerId }, data: { wins: { decrement: 1 } } });
+      }
+      if (prevLoserId) {
+        if (match.phase === "WINNER_BRACKET") {
+          await tx.team.update({ where: { id: prevLoserId }, data: { losses: { decrement: 1 } } });
+        } else if (match.phase === "LOSER_BRACKET") {
+          await tx.team.update({ where: { id: prevLoserId }, data: { losses: { decrement: 1 }, eliminated: false } });
+        }
+      }
+
+      // Annuler les paris réglés
+      for (const bet of allBets.filter((b) => b.settled)) {
+        if (bet.payout && bet.payout > 0) {
+          await tx.user.update({ where: { id: bet.userId }, data: { wizzBalance: { decrement: bet.payout } } });
+        }
+        await tx.bet.update({ where: { id: bet.id }, data: { settled: false, payout: null } });
+      }
+    }
+
+    // Appliquer le nouveau résultat
     await tx.match.update({
       where: { id },
       data: { status: "FINISHED", result, scoreA, scoreB },
     });
 
-    // Régler les paris
-    for (const bet of bets) {
+    // Régler tous les paris (y compris ceux annulés ci-dessus)
+    const betsToSettle = await tx.bet.findMany({ where: { matchId: id, settled: false } });
+    for (const bet of betsToSettle) {
       const won = bet.choice === result;
       const payout = won ? calculatePayout(bet.amountWizz, bet.oddsApplied, bet.jokerUsed) : 0;
       await tx.bet.update({ where: { id: bet.id }, data: { settled: true, payout } });
@@ -123,29 +146,18 @@ export async function PATCH(req: NextRequest) {
 
     // Victoire : incrémenter wins du gagnant (toutes phases)
     if (winnerId) {
-      await tx.team.update({
-        where: { id: winnerId },
-        data: { wins: { increment: 1 } },
-      });
+      await tx.team.update({ where: { id: winnerId }, data: { wins: { increment: 1 } } });
     }
 
     // Défaites bracket : progression / élimination
     if (match.phase === "WINNER_BRACKET" && loserId) {
-      // 1ère défaite → descend en LB
-      await tx.team.update({
-        where: { id: loserId },
-        data: { losses: { increment: 1 } },
-      });
+      await tx.team.update({ where: { id: loserId }, data: { losses: { increment: 1 } } });
     } else if (match.phase === "LOSER_BRACKET" && loserId) {
-      // 2ème défaite → éliminée
-      await tx.team.update({
-        where: { id: loserId },
-        data: { losses: { increment: 1 }, eliminated: true },
-      });
+      await tx.team.update({ where: { id: loserId }, data: { losses: { increment: 1 }, eliminated: true } });
     }
 
-    // Gestion FinalSeries BO3
-    if (match.finalSeriesId && winnerId) {
+    // Gestion FinalSeries BO3 (uniquement pour un nouveau résultat, pas une correction)
+    if (!isCorrection && match.finalSeriesId && winnerId) {
       const series = await tx.finalSeries.findUnique({ where: { id: match.finalSeriesId } });
       if (series) {
         const isTeamA = winnerId === series.teamAId;
@@ -155,14 +167,9 @@ export async function PATCH(req: NextRequest) {
 
         await tx.finalSeries.update({
           where: { id: series.id },
-          data: {
-            teamAWins: newWinsA,
-            teamBWins: newWinsB,
-            winnerTeamId: champion ?? undefined,
-          },
+          data: { teamAWins: newWinsA, teamBWins: newWinsB, winnerTeamId: champion ?? undefined },
         });
 
-        // Générer le match 3 si 1-1 et pas encore créé
         if (newWinsA === 1 && newWinsB === 1) {
           const existingM3 = await tx.match.findFirst({
             where: { finalSeriesId: series.id, status: { not: "FINISHED" } },
@@ -185,7 +192,7 @@ export async function PATCH(req: NextRequest) {
     }
   });
 
-  return NextResponse.json({ success: true, betsSettled: bets.length });
+  return NextResponse.json({ success: true, betsSettled: allBets.length, isCorrection });
   } catch (err) {
     console.error("[PATCH /api/admin/matches result]", err);
     return NextResponse.json(

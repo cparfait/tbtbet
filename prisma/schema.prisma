@@ -24,7 +24,6 @@ model User {
   image         String?   // avatar OAuth (NextAuth)
   avatarUrl     String?   // avatar affiché dans l'app
   passwordHash  String?   // auth email/password
-  googleId      String?   @unique
   role          Role      @default(USER)
   banned        Boolean   @default(false)
   wizzBalance      Int       @default(100)

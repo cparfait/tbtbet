@@ -63,8 +63,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: profile.name,
           email: profile.email,
           image: profile.picture,
-          avatarUrl: profile.picture,
-          googleId: profile.sub,
         };
       },
     }),

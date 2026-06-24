@@ -10,8 +10,6 @@ declare module "next-auth" {
 
   interface User {
     role?: "USER" | "ADMIN";
-    avatarUrl?: string | null;
-    googleId?: string | null;
   }
 }
 
