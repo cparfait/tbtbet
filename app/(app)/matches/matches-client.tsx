@@ -224,7 +224,7 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
               <div className="flex items-center gap-1">
                 {/* Team A */}
                 <div className="flex-1 flex items-center gap-2 min-w-0">
-                  <TeamLogo url={match.teamA.logoUrl} name={match.teamA.name} poolColor={match.teamA.pool?.color} className="size-9 rounded-lg" />
+                  <TeamLogo url={match.teamA.logoUrl} name={match.teamA.name} poolColor={phaseStyle?.color} className="size-9 rounded-lg" />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold truncate leading-tight">{match.teamA.name}</p>
                     <p className="text-[10px] font-bold text-[var(--color-accent)]">×{oddsA}</p>
@@ -247,7 +247,7 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
                     <p className="text-sm font-semibold truncate leading-tight">{match.teamB?.name ?? "À déterminer"}</p>
                     <p className="text-[10px] font-bold text-[var(--color-accent)]">×{oddsB}</p>
                   </div>
-                  <TeamLogo url={match.teamB?.logoUrl} name={match.teamB?.name ?? "?"} poolColor={match.teamB?.pool?.color} className="size-9 rounded-lg" />
+                  <TeamLogo url={match.teamB?.logoUrl} name={match.teamB?.name ?? "?"} poolColor={phaseStyle?.color} className="size-9 rounded-lg" />
                 </div>
               </div>
             )}
@@ -317,7 +317,7 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
           <div className="flex items-center gap-1">
             {/* Team A */}
             <div className="flex-1 flex items-center gap-2 min-w-0">
-              <TeamLogo url={match.teamA.logoUrl} name={match.teamA.name} poolColor={match.teamA.pool?.color} className="size-7 rounded-md" />
+              <TeamLogo url={match.teamA.logoUrl} name={match.teamA.name} poolColor={phaseStyle?.color} className="size-7 rounded-md" />
               <span className={cn(
                 "text-sm font-semibold truncate",
                 match.result === "TEAM_A" ? "text-[var(--color-accent)]" : "text-[var(--color-cream)]"
@@ -339,7 +339,7 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
               )}>
                 {match.teamB?.name ?? "?"}
               </span>
-              <TeamLogo url={match.teamB?.logoUrl} name={match.teamB?.name ?? "?"} poolColor={match.teamB?.pool?.color} className="size-7 rounded-md" />
+              <TeamLogo url={match.teamB?.logoUrl} name={match.teamB?.name ?? "?"} poolColor={phaseStyle?.color} className="size-7 rounded-md" />
             </div>
           </div>
 
