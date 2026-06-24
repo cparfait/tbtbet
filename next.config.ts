@@ -2,6 +2,18 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: "/uploads/:path*",
+          destination: "/api/uploads/:path*",
+        },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
   // bcryptjs est utilisé côté serveur (auth, bootstrap admin) — on évite de le
   // bundler (sinon webpack avertit qu'il ne résout pas 'crypto').
   serverExternalPackages: ["bcryptjs", "web-push"],
