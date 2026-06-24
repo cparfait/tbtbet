@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn, dayKey, dayLabel, formatKickoffTime } from "@/lib/utils";
-import { Users, Swords, Trophy, Plus, Trash2, CheckCircle2, Calendar, RefreshCw, ImageIcon, Upload } from "lucide-react";
+import { Users, Swords, Trophy, Plus, Trash2, CheckCircle2, Calendar, RefreshCw, ImageIcon, Upload, Wrench, RotateCcw, Sparkles } from "lucide-react";
 
 // ── Types ──
 
@@ -62,7 +62,7 @@ interface AdminConsoleProps {
   currentUserId: string;
 }
 
-type Tab = "teams" | "pools" | "matches" | "results" | "users";
+type Tab = "teams" | "pools" | "matches" | "results" | "users" | "tools";
 
 const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
   { key: "teams", label: "Équipes", icon: Swords },
@@ -70,6 +70,7 @@ const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
   { key: "matches", label: "Matchs", icon: Calendar },
   { key: "results", label: "Résultats", icon: CheckCircle2 },
   { key: "users", label: "Joueurs", icon: Users },
+  { key: "tools", label: "Outils", icon: Wrench },
 ];
 
 const PHASES = [
@@ -271,6 +272,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
   // ── Results ──
   async function handleSubmitResult() {
     if (!resultMatchId) return;
+    const isCorrection = matches.find((m) => m.id === resultMatchId)?.status === "FINISHED";
     try {
       await apiCall("/api/admin/matches", "PATCH", {
         id: resultMatchId,
@@ -279,7 +281,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
         result: resultWinner,
       });
       setResultMatchId(""); setResultScoreA(0); setResultScoreB(0);
-      ok("Résultat enregistré ! Paris réglés.");
+      ok(isCorrection ? "Résultat corrigé ! Paris recalculés." : "Résultat enregistré ! Paris réglés.");
     } catch (e) { err(e); }
   }
 
@@ -302,15 +304,40 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
     catch (e) { err(e); }
   }
 
+  async function handleToggleRole(userId: string, role: string) {
+    const newRole = role === "ADMIN" ? "USER" : "ADMIN";
+    try { await apiCall("/api/admin/users", "PATCH", { id: userId, role: newRole }); ok(newRole === "ADMIN" ? "Rôle admin accordé." : "Rôle admin retiré."); }
+    catch (e) { err(e); }
+  }
+
+  // ── Tools ──
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmDemo, setConfirmDemo] = useState(false);
+  const [toolLoading, setToolLoading] = useState<"reset" | "demo" | null>(null);
+
+  async function handleReset() {
+    setToolLoading("reset");
+    try { await apiCall("/api/admin/reset", "POST"); setConfirmReset(false); ok("Données réinitialisées."); }
+    catch (e) { err(e); }
+    finally { setToolLoading(null); }
+  }
+
+  async function handleSeedDemo() {
+    setToolLoading("demo");
+    try { await apiCall("/api/admin/seed-demo", "POST"); setConfirmDemo(false); ok("Données de démo injectées !"); }
+    catch (e) { err(e); }
+    finally { setToolLoading(null); }
+  }
+
   const pendingMatches = matches.filter((m) => m.status === "SCHEDULED" || m.status === "LIVE");
 
-  // Groupement de la liste : matchs datés → par jour, matchs sans date → par poule / bracket
-  const pendingGrouped = (() => {
+  // Groupement de la liste : TOUS les matchs, datés → par jour, sans date → par poule / bracket
+  const matchesGrouped = (() => {
     const poolMap = new Map(pools.map((p) => [p.id, p]));
-    const withDate = pendingMatches
+    const withDate = matches
       .filter((m): m is Match & { scheduledAt: Date | string } => m.scheduledAt != null)
       .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
-    const noDate = pendingMatches.filter((m) => !m.scheduledAt);
+    const noDate = matches.filter((m) => !m.scheduledAt);
 
     const byDayMap = new Map<string, Match[]>();
     for (const m of withDate) {
@@ -331,6 +358,8 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
     }
     return { byDay: [...byDayMap.entries()], byPool: [...byPoolMap.entries()], bracket, poolMap };
   })();
+
+  const selectedMatchForResult = matches.find((m) => m.id === resultMatchId);
   const poolMatches = matches
     .filter((m) => m.phase === "POOL")
     .sort((a, b) => {
@@ -341,7 +370,6 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
     });
   const bracketMatches = matches.filter((m) => m.phase !== "POOL");
 
-  const selectedMatchForResult = pendingMatches.find((m) => m.id === resultMatchId);
   const allowDrawResult = selectedMatchForResult?.phase === "POOL";
   const resultChoices: Array<"TEAM_A" | "DRAW" | "TEAM_B"> = allowDrawResult
     ? ["TEAM_A", "DRAW", "TEAM_B"]
@@ -782,31 +810,40 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
             {/* Liste des matchs en attente — groupée par date puis par poule */}
             <div className="max-h-56 overflow-y-auto rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] p-1.5 space-y-2">
               {pendingMatches.length === 0 && (
-                <p className="text-xs text-[var(--color-muted)] text-center py-2">Aucun match en attente.</p>
+                <p className="text-xs text-[var(--color-muted)] text-center py-2">Aucun match.</p>
               )}
 
               {/* Matchs datés → groupés par jour */}
-              {pendingGrouped.byDay.map(([dayKeyStr, dayMatches]) => (
+              {matchesGrouped.byDay.map(([dayKeyStr, dayMatches]) => (
                 <div key={dayKeyStr}>
                   <p className="text-[9px] font-bold uppercase tracking-wider text-[var(--color-muted)] px-1.5 py-1">
                     {dayLabel(dayMatches[0]!.scheduledAt!)}
                   </p>
                   {dayMatches.map((m) => {
-                    const pool = m.teamA.poolId ? pendingGrouped.poolMap.get(m.teamA.poolId) : null;
+                    const pool = m.teamA.poolId ? matchesGrouped.poolMap.get(m.teamA.poolId) : null;
                     const isSelected = resultMatchId === m.id;
+                    const isDone = m.status === "FINISHED";
                     return (
                       <button
                         key={m.id}
                         type="button"
                         onClick={() => {
-                          setResultMatchId(isSelected ? "" : m.id);
-                          if (!isSelected && m.phase !== "POOL" && resultWinner === "DRAW") setResultWinner("TEAM_A");
+                          const selecting = !isSelected;
+                          setResultMatchId(selecting ? m.id : "");
+                          if (selecting) {
+                            setResultScoreA(m.scoreA ?? 0);
+                            setResultScoreB(m.scoreB ?? 0);
+                            if (m.result) setResultWinner(m.result as "TEAM_A" | "TEAM_B" | "DRAW");
+                            else if (m.phase !== "POOL") setResultWinner("TEAM_A");
+                          }
                         }}
                         className={cn(
                           "w-full text-left rounded-md px-2 py-1.5 text-xs transition-colors flex items-center gap-1.5",
                           isSelected
                             ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
-                            : "hover:bg-[var(--color-surface-1)] text-[var(--color-cream)]"
+                            : isDone
+                            ? "text-[var(--color-muted)] hover:bg-[var(--color-surface-1)]"
+                            : "text-[var(--color-cream)] hover:bg-[var(--color-surface-1)]"
                         )}
                       >
                         {pool && (
@@ -818,9 +855,13 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                           </span>
                         )}
                         <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB.name}</span>
-                        <span className="shrink-0 text-[9px] text-[var(--color-muted)]">
-                          {formatKickoffTime(m.scheduledAt!)}
-                        </span>
+                        {isDone ? (
+                          <span className="shrink-0 text-[10px] text-green-400 font-bold">✓ {m.scoreA}-{m.scoreB}</span>
+                        ) : (
+                          <span className="shrink-0 text-[9px] text-[var(--color-muted)]">
+                            {formatKickoffTime(m.scheduledAt!)}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -828,8 +869,8 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
               ))}
 
               {/* Matchs sans date → groupés par poule */}
-              {pendingGrouped.byPool.map(([poolId, poolMatches]) => {
-                const pool = pendingGrouped.poolMap.get(poolId);
+              {matchesGrouped.byPool.map(([poolId, poolMatches]) => {
+                const pool = matchesGrouped.poolMap.get(poolId);
                 return (
                   <div key={poolId}>
                     <p
@@ -840,18 +881,27 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                     </p>
                     {poolMatches.map((m) => {
                       const isSelected = resultMatchId === m.id;
+                      const isDone = m.status === "FINISHED";
                       return (
                         <button
                           key={m.id}
                           type="button"
                           onClick={() => {
-                            setResultMatchId(isSelected ? "" : m.id);
+                            const selecting = !isSelected;
+                            setResultMatchId(selecting ? m.id : "");
+                            if (selecting) {
+                              setResultScoreA(m.scoreA ?? 0);
+                              setResultScoreB(m.scoreB ?? 0);
+                              if (m.result) setResultWinner(m.result as "TEAM_A" | "TEAM_B" | "DRAW");
+                            }
                           }}
                           className={cn(
                             "w-full text-left rounded-md px-2 py-1.5 text-xs transition-colors flex items-center gap-1.5",
                             isSelected
                               ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
-                              : "hover:bg-[var(--color-surface-1)] text-[var(--color-cream)]"
+                              : isDone
+                              ? "text-[var(--color-muted)] hover:bg-[var(--color-surface-1)]"
+                              : "text-[var(--color-cream)] hover:bg-[var(--color-surface-1)]"
                           )}
                         >
                           <span
@@ -861,6 +911,9 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                             {pool?.name ?? "?"}
                           </span>
                           <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB.name}</span>
+                          {isDone && (
+                            <span className="shrink-0 text-[10px] text-green-400 font-bold">✓ {m.scoreA}-{m.scoreB}</span>
+                          )}
                         </button>
                       );
                     })}
@@ -869,32 +922,43 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
               })}
 
               {/* Matchs sans date de bracket / finale */}
-              {pendingGrouped.bracket.length > 0 && (
+              {matchesGrouped.bracket.length > 0 && (
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-wider text-[var(--color-muted)] px-1.5 py-1">
                     Bracket / Finale
                   </p>
-                  {pendingGrouped.bracket.map((m) => {
+                  {matchesGrouped.bracket.map((m) => {
                     const isSelected = resultMatchId === m.id;
+                    const isDone = m.status === "FINISHED";
                     return (
                       <button
                         key={m.id}
                         type="button"
                         onClick={() => {
-                          setResultMatchId(isSelected ? "" : m.id);
-                          if (!isSelected) setResultWinner("TEAM_A");
+                          const selecting = !isSelected;
+                          setResultMatchId(selecting ? m.id : "");
+                          if (selecting) {
+                            setResultScoreA(m.scoreA ?? 0);
+                            setResultScoreB(m.scoreB ?? 0);
+                            if (m.result) setResultWinner(m.result as "TEAM_A" | "TEAM_B" | "DRAW");
+                            else setResultWinner("TEAM_A");
+                          }
                         }}
                         className={cn(
                           "w-full text-left rounded-md px-2 py-1.5 text-xs transition-colors flex items-center gap-1.5",
                           isSelected
                             ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
-                            : "hover:bg-[var(--color-surface-1)] text-[var(--color-cream)]"
+                            : isDone
+                            ? "text-[var(--color-muted)] hover:bg-[var(--color-surface-1)]"
+                            : "text-[var(--color-cream)] hover:bg-[var(--color-surface-1)]"
                         )}
                       >
                         <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB.name}</span>
-                        {m.label && !m.label.includes(" vs ") && (
+                        {isDone ? (
+                          <span className="shrink-0 text-[10px] text-green-400 font-bold">✓ {m.scoreA}-{m.scoreB}</span>
+                        ) : m.label && !m.label.includes(" vs ") ? (
                           <span className="shrink-0 text-[9px] text-[var(--color-muted)]">{m.label}</span>
-                        )}
+                        ) : null}
                       </button>
                     );
                   })}
@@ -903,7 +967,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
             </div>
 
             {resultMatchId && (() => {
-              const m = pendingMatches.find((x) => x.id === resultMatchId);
+              const m = matches.find((x) => x.id === resultMatchId);
               return m ? (
                 <>
                   <div className="flex items-center gap-2">
@@ -933,7 +997,8 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
             })()}
 
             <Button onClick={handleSubmitResult} disabled={!resultMatchId} className="w-full text-xs">
-              <CheckCircle2 className="size-3.5 mr-1" /> Enregistrer + Régler les paris
+              <CheckCircle2 className="size-3.5 mr-1" />
+              {selectedMatchForResult?.status === "FINISHED" ? "Corriger le résultat" : "Enregistrer + Régler les paris"}
             </Button>
           </Card>
 
@@ -998,19 +1063,119 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                   </p>
                 </div>
                 {user.id !== currentUserId && (
-                  <button
-                    onClick={() => handleToggleBan(user.id, user.banned)}
-                    className={cn(
-                      "text-xs px-2 py-1 rounded",
-                      user.banned ? "bg-green-400/10 text-green-400" : "bg-red-400/10 text-red-400"
-                    )}
-                  >
-                    {user.banned ? "Débannir" : "Bannir"}
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => handleToggleRole(user.id, user.role)}
+                      className={cn(
+                        "text-xs px-2 py-1 rounded",
+                        user.role === "ADMIN"
+                          ? "bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
+                          : "bg-[var(--color-surface-2)] text-[var(--color-muted)] hover:text-[var(--color-cream)]"
+                      )}
+                    >
+                      {user.role === "ADMIN" ? "Retirer admin" : "Rendre admin"}
+                    </button>
+                    <button
+                      onClick={() => handleToggleBan(user.id, user.banned)}
+                      className={cn(
+                        "text-xs px-2 py-1 rounded",
+                        user.banned ? "bg-green-400/10 text-green-400" : "bg-red-400/10 text-red-400"
+                      )}
+                    >
+                      {user.banned ? "Débannir" : "Bannir"}
+                    </button>
+                  </div>
                 )}
               </Card>
             ))}
           </div>
+        </div>
+      )}
+
+      {tab === "tools" && (
+        <div className="space-y-4">
+          {/* Reset */}
+          <Card className="p-4 space-y-3 border border-red-500/20">
+            <div className="flex items-start gap-3">
+              <RotateCcw className="size-5 text-red-400 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-semibold text-red-400">Réinitialiser les données</h3>
+                <p className="text-xs text-[var(--color-muted)] mt-0.5">
+                  Supprime toutes les équipes, poules, matchs, paris et joueurs.
+                  Le compte admin est conservé (solde remis à 100 Wizz).
+                </p>
+              </div>
+            </div>
+            {!confirmReset ? (
+              <Button
+                onClick={() => setConfirmReset(true)}
+                className="w-full text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30"
+              >
+                <RotateCcw className="size-3.5 mr-1" /> Réinitialiser
+              </Button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-red-400 font-medium text-center">⚠ Cette action est irréversible. Confirmer ?</p>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleReset}
+                    disabled={toolLoading === "reset"}
+                    className="flex-1 text-xs bg-red-500 text-white hover:bg-red-600"
+                  >
+                    {toolLoading === "reset" ? "En cours…" : "Oui, tout supprimer"}
+                  </Button>
+                  <Button
+                    onClick={() => setConfirmReset(false)}
+                    className="flex-1 text-xs"
+                  >
+                    Annuler
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* Demo */}
+          <Card className="p-4 space-y-3 border border-[var(--color-accent)]/20">
+            <div className="flex items-start gap-3">
+              <Sparkles className="size-5 text-[var(--color-accent)] shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--color-accent)]">Injecter les données de démo</h3>
+                <p className="text-xs text-[var(--color-muted)] mt-0.5">
+                  Réinitialise puis injecte un tournoi complet : 3 poules, 10 équipes,
+                  12 matchs de poule terminés, 5 matchs de bracket à venir,
+                  5 joueurs démo (alice/bob/charlie/diana/eve @demo.com · mot de passe : Demo1234!).
+                </p>
+              </div>
+            </div>
+            {!confirmDemo ? (
+              <Button
+                onClick={() => setConfirmDemo(true)}
+                className="w-full text-xs"
+              >
+                <Sparkles className="size-3.5 mr-1" /> Injecter la démo
+              </Button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-[var(--color-accent)] font-medium text-center">Les données actuelles seront remplacées. Confirmer ?</p>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleSeedDemo}
+                    disabled={toolLoading === "demo"}
+                    className="flex-1 text-xs"
+                  >
+                    {toolLoading === "demo" ? "Injection…" : "Oui, injecter"}
+                  </Button>
+                  <Button
+                    onClick={() => setConfirmDemo(false)}
+                    className="flex-1 text-xs bg-[var(--color-surface-2)] text-[var(--color-muted)] hover:bg-[var(--color-surface-1)]"
+                  >
+                    Annuler
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Card>
         </div>
       )}
     </div>
