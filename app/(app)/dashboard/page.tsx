@@ -225,9 +225,9 @@ export default async function DashboardPage() {
       </div>
 
       {/* Ton favori */}
-      <Card className="p-4">
+      <Card className={`p-4 ${!championBet ? "animate-pulse-gold border border-[var(--color-accent)]/30" : ""}`}>
         <div className="flex items-center gap-3">
-          <Star className="size-5 text-[var(--color-accent)] shrink-0" />
+          <Star className={`size-5 text-[var(--color-accent)] shrink-0 ${!championBet ? "animate-float" : ""}`} />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold">Ton favori</p>
             <p className="text-xs text-[var(--color-muted)] truncate">

@@ -3,15 +3,24 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Trophy, Zap, Dices, Shield } from "lucide-react";
+import { Trophy, Zap, Dices, Shield, User } from "lucide-react";
 
-export function WelcomeModal() {
+export function WelcomeModal({ initialName }: { initialName: string }) {
   const router = useRouter();
+  const [name, setName] = useState(initialName);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleFinish() {
+    const trimmed = name.trim();
+    if (!trimmed) { setError("Entre un pseudo pour continuer."); return; }
     setSubmitting(true);
-    await fetch("/api/profile/welcome", { method: "POST" });
+    setError(null);
+    await fetch("/api/profile/welcome", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: trimmed }),
+    });
     router.refresh();
   }
 
@@ -23,12 +32,31 @@ export function WelcomeModal() {
       {/* Panel */}
       <div className="relative z-10 w-full max-w-md rounded-t-3xl sm:rounded-3xl glass-strong p-6 pb-10 sm:pb-6 shadow-2xl shadow-black/60">
         <div className="mb-6 text-center">
-          <p className="text-3xl mb-2">🏓</p>
+          <p className="text-3xl mb-2">⚽</p>
           <h2 className="text-xl font-bold text-[var(--color-cream)] font-[family-name:var(--font-display)]">
             Bienvenue sur TBT Bet !
           </h2>
           <p className="mt-1 text-sm text-[var(--color-muted)]">
             Le tournoi de babyfoot Withings — parie, grimpe, gagne.
+          </p>
+        </div>
+
+        {/* Pseudo */}
+        <div className="mb-5">
+          <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-[var(--color-muted)]">
+            <User className="size-3.5" />
+            Ton pseudo
+          </label>
+          <input
+            value={name}
+            onChange={(e) => { setName(e.target.value); setError(null); }}
+            maxLength={50}
+            placeholder="Ex : Rockets FC"
+            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-4 py-2.5 text-sm text-[var(--color-cream)] placeholder:text-[var(--color-muted)] outline-none focus:border-[var(--color-accent)]/60 focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
+          />
+          {error && <p className="mt-1.5 text-xs text-red-400">{error}</p>}
+          <p className="mt-1.5 text-[10px] text-[var(--color-muted)]">
+            Tu pourras le changer depuis ton profil.
           </p>
         </div>
 

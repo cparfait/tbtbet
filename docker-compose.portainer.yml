@@ -21,11 +21,13 @@
 #   Portainer → Registries → Add registry → GitHub (ghcr.io)
 #
 # Variables obligatoires (onglet Env de Portainer) :
-#   AUTH_SECRET       = openssl rand -base64 32
-#   AUTH_URL          = https://tbtbet.cparfait.ovh   ← URL publique
-#   ADMIN_EMAIL       = admin@example.com
-#   ADMIN_PASSWORD    = (mot de passe admin initial)
-#   POSTGRES_PASSWORD = (mot de passe sécurisé)
+#   AUTH_SECRET        = openssl rand -base64 32
+#   AUTH_URL           = https://tbtbet.cparfait.ovh   ← URL publique
+#   ADMIN_EMAIL        = admin@example.com
+#   ADMIN_PASSWORD     = (mot de passe admin initial)
+#   POSTGRES_PASSWORD  = (mot de passe sécurisé)
+#   AUTH_GOOGLE_ID     = xxxxxx.apps.googleusercontent.com
+#   AUTH_GOOGLE_SECRET = GOCSPX-xxxxxxxxxxxxxxxxx
 # ──────────────────────────────────────────────────────────────────────────────
 
 services:

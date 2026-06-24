@@ -28,12 +28,7 @@ export default async function ProfilePage() {
     : null;
 
   const avatarSrc = user.avatarUrl ?? user.image ?? null;
-  const initials = (user.name ?? "?")
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  const initials = (user.name ?? "?").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
   return (
     <div className="space-y-5">
@@ -41,37 +36,22 @@ export default async function ProfilePage() {
 
       {/* Avatar + nom */}
       <Card className="p-5">
-        <div className="flex items-center gap-4 mb-5">
-          <div className="relative shrink-0">
-            {avatarSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarSrc}
-                alt={user.name ?? "avatar"}
-                className="size-16 rounded-full object-cover ring-2 ring-[var(--color-accent)]/40"
-              />
-            ) : (
-              <span className="flex size-16 items-center justify-center rounded-full bg-[var(--color-accent)]/15 text-2xl font-bold text-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/30">
-                {initials}
-              </span>
-            )}
-          </div>
-          <div className="min-w-0">
-            <p className="text-lg font-bold truncate text-[var(--color-cream)]">
-              {user.name || "Anonyme"}
-            </p>
-            <p className="text-xs text-[var(--color-muted)] truncate">{user.email}</p>
-            {user.role === "ADMIN" && (
-              <span className="mt-1 inline-block rounded-full bg-[var(--color-accent)]/15 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-accent)]">
-                ADMIN
-              </span>
-            )}
-          </div>
+        <div className="mb-1">
+          <p className="text-lg font-bold truncate text-[var(--color-cream)]">
+            {user.name || "Anonyme"}
+          </p>
+          <p className="text-xs text-[var(--color-muted)] truncate">{user.email}</p>
+          {user.role === "ADMIN" && (
+            <span className="mt-1 inline-block rounded-full bg-[var(--color-accent)]/15 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-accent)]">
+              ADMIN
+            </span>
+          )}
         </div>
 
         <ProfileForm
           currentName={user.name ?? ""}
-          currentAvatarUrl={user.avatarUrl ?? ""}
+          currentAvatarUrl={avatarSrc ?? ""}
+          initials={initials}
         />
       </Card>
 

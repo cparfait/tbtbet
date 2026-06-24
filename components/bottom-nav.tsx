@@ -8,15 +8,18 @@ import {
   CalendarDays,
   Trophy,
   MessageCircle,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const ITEMS = [
+const BASE_ITEMS = [
   { href: "/dashboard", label: "Accueil", icon: Home },
   { href: "/matches", label: "Matchs", icon: CalendarDays },
   { href: "/leaderboard", label: "Classement", icon: Trophy },
   { href: "/chat", label: "Chat", icon: MessageCircle },
 ] as const;
+
+const ADMIN_ITEM = { href: "/admin", label: "Admin", icon: ShieldCheck } as const;
 
 /** Détecte les nouveaux messages du tchat (pastille). */
 function useChatUnread(pathname: string): boolean {
@@ -55,16 +58,17 @@ function useChatUnread(pathname: string): boolean {
   return unread && !onChat;
 }
 
-export function BottomNav() {
+export function BottomNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
   const chatUnread = useChatUnread(pathname);
+  const items = isAdmin ? [...BASE_ITEMS, ADMIN_ITEM] : BASE_ITEMS;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 pb-[env(safe-area-inset-bottom)]">
       <div className="absolute inset-0 glass-strong" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--color-border-medium)] to-transparent" />
       <ul className="relative mx-auto flex max-w-md items-stretch justify-around px-2 pt-1.5 pb-2">
-        {ITEMS.map(({ href, label, icon: Icon }) => {
+        {items.map(({ href, label, icon: Icon }) => {
           const active =
             pathname === href || pathname.startsWith(`${href}/`);
           return (

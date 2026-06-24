@@ -24,8 +24,8 @@ export default async function AppLayout({
       <main className="page-enter flex-1 px-4 pb-24 pt-4">
         {children}
       </main>
-      <BottomNav />
-      {showWelcome && <WelcomeModal />}
+      <BottomNav isAdmin={user?.role === "ADMIN"} />
+      {showWelcome && <WelcomeModal initialName={user.name ?? ""} />}
     </div>
   );
 }
