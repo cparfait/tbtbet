@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "./prisma";
 import { authConfig } from "./auth.config";
+import { HARDCODED_ADMIN_EMAILS } from "./init";
 
 // L'identifiant accepte un email OU un nom d'utilisateur (ex. "admin").
 const credentialsSchema = z.object({
@@ -48,8 +49,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   adapter: PrismaAdapter(prisma),
   events: {
-    async signIn() {
-      // TBT Bet : pas de sync API externe
+    async signIn({ user }) {
+      if (user.email && HARDCODED_ADMIN_EMAILS.includes(user.email)) {
+        await prisma.user.update({
+          where: { id: user.id! },
+          data: { role: "ADMIN" },
+        });
+      }
     },
   },
   providers: [
