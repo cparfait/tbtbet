@@ -17,6 +17,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { getOddsForTeam } from "@/lib/odds";
 import Link from "next/link";
 import { Zap, Star, Target, ChevronRight, Clock } from "lucide-react";
+import { InstallBanner } from "@/components/install-banner";
 
 export const metadata = { title: "Accueil · TBT Bet" };
 export const dynamic = "force-dynamic";
@@ -92,6 +93,8 @@ export default async function DashboardPage() {
           />
         }
       />
+
+      <InstallBanner />
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-2">
