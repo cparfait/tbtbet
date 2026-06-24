@@ -52,15 +52,22 @@ export function poolRankLabel(rank: number, anyPlayed: boolean): { label: string
   return { label: "→ LB", color: "text-orange-400" };
 }
 
-/** Traduit un label de match stocké en DB vers un libellé lisible.
- *  "WB R1 — Équipe A vs Équipe B" → "Winners Bracket · Round 1"
- *  Supprime la partie équipes (après " — "). */
+/** Retourne la partie spécifique du label (sans le préfixe de phase ni les équipes).
+ *  Le badge de phase affiché à côté rend ces préfixes redondants.
+ *  "Poule A — Rois vs Sultans" → ""
+ *  "WB R1 — ..."               → "R1"
+ *  "WB Tour 1 · M2"            → "Tour 1 · M2"
+ *  "Finale · Match 1"          → "Match 1" */
 export function formatMatchLabel(label: string | null | undefined): string {
   if (!label) return "";
-  const phase = label.split(" — ")[0] ?? label;
-  return phase
-    .replace(/^WB\s+R(\d+)$/i, (_, n) => `Winners Bracket · Round ${n}`)
-    .replace(/^LB\s+R(\d+)$/i, (_, n) => `Loser Bracket · Round ${n}`);
+  const s = (label.split(" — ")[0] ?? label).trim();
+  return s
+    .replace(/^WB\s+R(\d+)$/i, "R$1")      // "WB R1" → "R1"
+    .replace(/^LB\s+R(\d+)$/i, "R$1")      // "LB R1" → "R1"
+    .replace(/^(?:WB|LB)\s+/i, "")         // "WB Tour 1 · M2" → "Tour 1 · M2"
+    .replace(/^Finale\s*[·\-]\s*/i, "")    // "Finale · Match 1" → "Match 1"
+    .replace(/^Poule\s+\S+\s*([·\-]\s*)?/i, "") // "Poule A" ou "Poule A · …" → "" ou "…"
+    .trim();
 }
 
 /** Libellé lisible d'un jour (ex. "Aujourd'hui", "Demain", "ven. 14 juin"). */
