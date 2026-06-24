@@ -6,6 +6,8 @@ import { getPoolStandings } from "@/lib/data/queries";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { TeamLogo } from "@/components/team-logo";
+import { poolRankLabel } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -36,15 +38,7 @@ export default async function PoolStandingsPage({
     orderBy: { scheduledAt: "asc" },
   });
 
-  // Ne pas afficher → WB / → LB tant qu'aucun match de poule n'a été joué
   const anyMatchPlayed = matches.some((m) => m.status === "FINISHED");
-
-  const rankLabel = (i: number) => {
-    if (!anyMatchPlayed) return null;
-    if (i === 0) return { label: "→ WB", color: "text-green-400" };
-    if (i === 1) return { label: "→ WB", color: "text-green-400" };
-    return { label: "→ LB", color: "text-orange-400" };
-  };
 
   return (
     <div className="space-y-5">
@@ -72,7 +66,7 @@ export default async function PoolStandingsPage({
         </div>
         <div className="space-y-1">
           {standings.map((s, i) => {
-            const rank = rankLabel(i);
+            const rank = poolRankLabel(i, anyMatchPlayed);
             return (
               <Card
                 key={s.team.id}
@@ -81,10 +75,7 @@ export default async function PoolStandingsPage({
                 <span className="text-sm font-bold w-5 text-center">{i + 1}</span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    {s.team.logoUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={s.team.logoUrl} alt={s.team.name} className="size-5 object-contain rounded" />
-                    )}
+                    <TeamLogo url={s.team.logoUrl} name={s.team.name} poolColor={pool.color} className="size-5 rounded" />
                     <p className="text-sm font-medium truncate">{s.team.name}</p>
                   </div>
                   {rank && (
@@ -119,13 +110,13 @@ export default async function PoolStandingsPage({
                   {m.status === "FINISHED" ? (
                     /* Résultat */
                     <div className="flex items-center justify-between gap-2">
-                      <span className={`flex-1 text-sm font-semibold truncate ${m.result === "TEAM_A" ? "text-[var(--color-accent)]" : ""}`}>
+                      <span className={`flex-1 text-sm font-semibold truncate ${m.result === "TEAM_A" ? "text-green-400" : ""}`}>
                         {m.teamA.name}
                       </span>
                       <span className="shrink-0 text-base font-bold">
                         {m.scoreA}&nbsp;–&nbsp;{m.scoreB}
                       </span>
-                      <span className={`flex-1 text-sm font-semibold text-right truncate ${m.result === "TEAM_B" ? "text-[var(--color-accent)]" : ""}`}>
+                      <span className={`flex-1 text-sm font-semibold text-right truncate ${m.result === "TEAM_B" ? "text-green-400" : ""}`}>
                         {m.teamB.name}
                       </span>
                     </div>

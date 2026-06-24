@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
+import { TeamLogo } from "@/components/team-logo";
 
 interface Team {
   id: string;
@@ -68,12 +69,7 @@ export function ChampionBetForm({ teams }: ChampionBetFormProps) {
         </div>
 
         <div className="flex items-center gap-3 rounded-xl bg-[var(--color-surface-2)] px-4 py-3">
-          {selectedTeam?.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={selectedTeam.logoUrl} alt={selectedTeam.name} className="size-10 rounded-lg object-contain" />
-          ) : (
-            <div className="size-10 rounded-lg bg-[var(--color-surface-1)]" />
-          )}
+          {selectedTeam && <TeamLogo url={selectedTeam.logoUrl} name={selectedTeam.name} className="size-10 rounded-lg" />}
           <div>
             <p className="text-[10px] text-[var(--color-muted)]">Ton choix</p>
             <p className="text-base font-bold">{selectedTeam?.name}</p>

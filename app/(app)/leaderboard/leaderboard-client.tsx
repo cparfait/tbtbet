@@ -5,7 +5,8 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Trophy, ChevronRight, Users, ArrowUp, ArrowDown, Minus } from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, poolRankLabel } from "@/lib/utils";
+import { TeamLogo } from "@/components/team-logo";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -208,28 +209,30 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
                       <span className="w-8 text-center font-black">Pts</span>
                     </div>
 
-                    {pool.standings.map(({ team, wins, draws, losses, played, points }, i) => (
-                      <div
-                        key={team.id}
-                        className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center px-3 py-2"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="shrink-0 text-[10px] text-[var(--color-muted)] w-4">{i + 1}</span>
-                          {team.logoUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={team.logoUrl} alt={team.name} className="size-5 rounded object-contain shrink-0" />
-                          ) : (
-                            <div className="size-5 rounded bg-[var(--color-surface-2)] shrink-0" />
-                          )}
-                          <span className="text-xs font-medium truncate">{team.name}</span>
+                    {pool.standings.map(({ team, wins, draws, losses, played, points }, i) => {
+                      const anyPlayed = pool.standings.some(s => s.played > 0);
+                      const rank = poolRankLabel(i, anyPlayed);
+                      return (
+                        <div
+                          key={team.id}
+                          className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center px-3 py-2 border-b border-[var(--color-border-subtle)] last:border-0"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="shrink-0 text-[10px] text-[var(--color-muted)] w-4">{i + 1}</span>
+                            <TeamLogo url={team.logoUrl} name={team.name} poolColor={pool.color} className="size-5 rounded" />
+                            <div className="min-w-0">
+                              <span className="text-xs font-medium truncate block">{team.name}</span>
+                              {rank && <span className={`text-[9px] font-semibold ${rank.color}`}>{rank.label}</span>}
+                            </div>
+                          </div>
+                          <span className="w-6 text-center text-xs text-[var(--color-muted)]">{played}</span>
+                          <span className="w-6 text-center text-xs text-green-400">{wins}</span>
+                          <span className="w-6 text-center text-xs text-[var(--color-muted)]">{draws}</span>
+                          <span className="w-6 text-center text-xs text-red-400">{losses}</span>
+                          <span className="w-8 text-center text-xs font-black text-[var(--color-cream)]">{points}</span>
                         </div>
-                        <span className="w-6 text-center text-xs text-[var(--color-muted)]">{played}</span>
-                        <span className="w-6 text-center text-xs text-green-400">{wins}</span>
-                        <span className="w-6 text-center text-xs text-[var(--color-muted)]">{draws}</span>
-                        <span className="w-6 text-center text-xs text-red-400">{losses}</span>
-                        <span className="w-8 text-center text-xs font-black text-[var(--color-cream)]">{points}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </Card>
                 )}
               </div>

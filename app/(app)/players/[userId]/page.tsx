@@ -5,45 +5,12 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, Zap } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { TeamLogo } from "@/components/team-logo";
+import { UserAvatar } from "@/components/user-avatar";
+
 
 export const dynamic = "force-dynamic";
 
-function Avatar({
-  name,
-  src,
-  size = 48,
-}: {
-  name: string | null;
-  src: string | null;
-  size?: number;
-}) {
-  const initials = (name ?? "?")
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
-  if (src) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return (
-      <img
-        src={src}
-        alt={name ?? "avatar"}
-        className="rounded-full object-cover ring-2 ring-[var(--color-accent)]/30"
-        style={{ width: size, height: size }}
-      />
-    );
-  }
-  return (
-    <span
-      className="flex items-center justify-center rounded-full bg-[var(--color-accent)]/20 font-bold text-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/30"
-      style={{ width: size, height: size, fontSize: size * 0.38 }}
-    >
-      {initials}
-    </span>
-  );
-}
 
 type BetChoice = "TEAM_A" | "TEAM_B" | "DRAW";
 
@@ -155,7 +122,7 @@ export default async function PlayerPage({
         <div className="flex items-center justify-between gap-2">
           {/* Moi */}
           <div className="flex flex-col items-center gap-1.5 flex-1">
-            <Avatar name={currentUser?.name ?? null} src={currentAvatarSrc} size={52} />
+            <UserAvatar src={currentAvatarSrc} name={currentUser?.name} className="size-[52px]" />
             <p className="text-xs font-semibold text-center truncate max-w-[80px] text-[var(--color-cream)]">
               {currentUser?.name ?? "Moi"}
             </p>
@@ -187,7 +154,7 @@ export default async function PlayerPage({
 
           {/* Eux */}
           <div className="flex flex-col items-center gap-1.5 flex-1">
-            <Avatar name={targetUser.name} src={targetAvatarSrc} size={52} />
+            <UserAvatar src={targetAvatarSrc} name={targetUser.name} className="size-[52px]" />
             <p className="text-xs font-semibold text-center truncate max-w-[80px] text-[var(--color-cream)]">
               {targetUser.name ?? "Anonyme"}
             </p>
@@ -221,10 +188,7 @@ export default async function PlayerPage({
                 {/* Match header */}
                 <div className="flex items-center justify-between gap-2 mb-2.5">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    {match.teamA.logoUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={match.teamA.logoUrl} alt="" className="size-4 object-contain rounded" />
-                    )}
+                    <TeamLogo url={match.teamA.logoUrl} name={match.teamA.name} className="size-4 rounded" />
                     <span
                       className={cn(
                         "text-xs font-semibold truncate",
@@ -248,10 +212,7 @@ export default async function PlayerPage({
                     >
                       {match.teamB.name}
                     </span>
-                    {match.teamB.logoUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={match.teamB.logoUrl} alt="" className="size-4 object-contain rounded" />
-                    )}
+                    <TeamLogo url={match.teamB.logoUrl} name={match.teamB.name} className="size-4 rounded" />
                   </div>
                 </div>
 

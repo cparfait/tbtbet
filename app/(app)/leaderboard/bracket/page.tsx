@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getFinalSeries } from "@/lib/data/queries";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { TeamLogo } from "@/components/team-logo";
 
 export const metadata = { title: "Bracket · TBT Bet" };
 export const dynamic = "force-dynamic";
@@ -49,6 +50,16 @@ export default async function BracketPage() {
     return { text: "À venir", cls: "text-orange-400" };
   };
 
+  function WLBadge({ wins, losses }: { wins: number; losses: number }) {
+    return (
+      <span className="shrink-0 flex items-center gap-0.5 text-[9px] font-semibold">
+        <span className={wins > 0 ? "text-green-400" : "text-[var(--color-muted)]"}>{wins}V</span>
+        <span className="text-[var(--color-muted)]">·</span>
+        <span className={losses > 0 ? "text-orange-400" : "text-[var(--color-muted)]"}>{losses}D</span>
+      </span>
+    );
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function MatchCard({ match }: { match: any }) {
     const { text, cls } = statusLabel(match.status);
@@ -60,29 +71,23 @@ export default async function BracketPage() {
           <div className="mt-1 space-y-1">
             <div className={`flex items-center justify-between gap-2 ${isFinished && match.result === "TEAM_A" ? "text-[var(--color-accent)]" : ""}`}>
               <div className="flex items-center gap-1.5 min-w-0">
-                {match.teamA.logoUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={match.teamA.logoUrl} alt="" className="size-4 rounded object-contain" />
-                )}
+                <TeamLogo url={match.teamA.logoUrl} name={match.teamA.name} className="size-4 rounded" />
                 <span className="text-xs font-medium truncate">{match.teamA.name}</span>
-                {match.teamA.losses === 1 && !isFinished && (
-                  <span className="text-[9px] text-orange-400 shrink-0">(1 def)</span>
-                )}
               </div>
-              {isFinished && <span className="text-xs font-bold shrink-0">{match.scoreA}</span>}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <WLBadge wins={match.teamA.wins} losses={match.teamA.losses} />
+                {isFinished && <span className="text-xs font-bold">{match.scoreA}</span>}
+              </div>
             </div>
             <div className={`flex items-center justify-between gap-2 ${isFinished && match.result === "TEAM_B" ? "text-[var(--color-accent)]" : ""}`}>
               <div className="flex items-center gap-1.5 min-w-0">
-                {match.teamB.logoUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={match.teamB.logoUrl} alt="" className="size-4 rounded object-contain" />
-                )}
+                <TeamLogo url={match.teamB.logoUrl} name={match.teamB.name} className="size-4 rounded" />
                 <span className="text-xs font-medium truncate">{match.teamB.name}</span>
-                {match.teamB.losses === 1 && !isFinished && (
-                  <span className="text-[9px] text-orange-400 shrink-0">(1 def)</span>
-                )}
               </div>
-              {isFinished && <span className="text-xs font-bold shrink-0">{match.scoreB}</span>}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <WLBadge wins={match.teamB.wins} losses={match.teamB.losses} />
+                {isFinished && <span className="text-xs font-bold">{match.scoreB}</span>}
+              </div>
             </div>
           </div>
         </Card>

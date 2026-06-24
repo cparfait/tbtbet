@@ -1,11 +1,13 @@
 import { redirect, notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
-import { getMatchById, getUserBetForMatch, getUserById } from "@/lib/data/queries";
+import { getMatchById, getUserBetForMatch, getUserById, getPoolStandings, getPoolMatchesByPoolId } from "@/lib/data/queries";
 import { getOddsForTeam, getOddsForDraw } from "@/lib/odds";
 import { BetForm } from "./bet-form";
 import Link from "next/link";
 import { ArrowLeft, Lock } from "lucide-react";
+import { formatMatchLabel, poolRankLabel } from "@/lib/utils";
+import { TeamLogo } from "@/components/team-logo";
 
 export const metadata = { title: "Match · TBT Bet" };
 export const dynamic = "force-dynamic";
@@ -39,6 +41,11 @@ export default async function MatchDetailPage({
   ]);
 
   if (!match) notFound();
+
+  const poolId = match.phase === "POOL" ? match.teamA.pool?.id : null;
+  const [poolData, poolMatches] = poolId
+    ? await Promise.all([getPoolStandings(poolId), getPoolMatchesByPoolId(poolId)])
+    : [null, []];
 
   const oddsA = getOddsForTeam(match.phase, match.teamASource, match.teamBSource, match.teamA.wins);
   const oddsB = getOddsForTeam(match.phase, match.teamBSource, match.teamASource, match.teamB.wins);
@@ -77,8 +84,7 @@ export default async function MatchDetailPage({
         {/* Bandeau phase + statut */}
         <div className="flex items-center justify-between bg-[var(--color-surface-2)] px-4 py-2">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
-            {PHASE_LABEL[match.phase] ?? match.phase}
-            {match.label ? ` · ${match.label}` : ""}
+            {formatMatchLabel(match.label) || (PHASE_LABEL[match.phase] ?? match.phase)}
           </span>
           {isLive && (
             <span className="flex items-center gap-1 text-[10px] font-semibold text-red-400">
@@ -103,16 +109,7 @@ export default async function MatchDetailPage({
           <div className="flex items-center gap-2">
             {/* Équipe A */}
             <div className="flex-1 flex flex-col items-center gap-2 text-center">
-              {match.teamA.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={match.teamA.logoUrl}
-                  alt={match.teamA.name}
-                  className="size-14 rounded-xl object-contain"
-                />
-              ) : (
-                <div className="size-14 rounded-xl bg-[var(--color-surface-2)]" />
-              )}
+              <TeamLogo url={match.teamA.logoUrl} name={match.teamA.name} poolColor={match.teamA.pool?.color} className="size-14 rounded-xl" />
               <div>
                 <p
                   className={`font-bold text-base leading-tight ${
@@ -174,16 +171,7 @@ export default async function MatchDetailPage({
 
             {/* Équipe B */}
             <div className="flex-1 flex flex-col items-center gap-2 text-center">
-              {match.teamB.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={match.teamB.logoUrl}
-                  alt={match.teamB.name}
-                  className="size-14 rounded-xl object-contain"
-                />
-              ) : (
-                <div className="size-14 rounded-xl bg-[var(--color-surface-2)]" />
-              )}
+              <TeamLogo url={match.teamB.logoUrl} name={match.teamB.name} poolColor={match.teamB.pool?.color} className="size-14 rounded-xl" />
               <div>
                 <p
                   className={`font-bold text-base leading-tight ${
@@ -295,6 +283,109 @@ export default async function MatchDetailPage({
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Classement de la poule ── */}
+      {poolData && (
+        <div>
+          <div className="mb-2 flex items-center gap-2">
+            <span className="rounded-full px-2 py-0.5 text-[9px] font-semibold"
+              style={{ background: poolData.pool.color + "25", color: poolData.pool.color }}>
+              {poolData.pool.name}
+            </span>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">Classement</p>
+          </div>
+          <Card className="overflow-hidden border-l-4" style={{ borderLeftColor: poolData.pool.color }}>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-[var(--color-border-subtle)] text-[var(--color-muted)]">
+                  <th className="px-3 py-2 text-left font-medium">#</th>
+                  <th className="px-3 py-2 text-left font-medium">Équipe</th>
+                  <th className="px-2 py-2 text-center font-medium">J</th>
+                  <th className="px-2 py-2 text-center font-medium">G</th>
+                  <th className="px-2 py-2 text-center font-medium">N</th>
+                  <th className="px-2 py-2 text-center font-medium">P</th>
+                  <th className="px-2 py-2 text-center font-medium">Diff</th>
+                  <th className="px-3 py-2 text-center font-bold">Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {poolData.standings.map((row, i) => {
+                  const isCurrent = row.team.id === match.teamA.id || row.team.id === match.teamB.id;
+                  const anyPlayed = poolMatches.some(pm => pm.status === "FINISHED");
+                  const rank = poolRankLabel(i, anyPlayed);
+                  return (
+                    <tr
+                      key={row.team.id}
+                      className={`border-b border-[var(--color-border-subtle)] last:border-0 ${isCurrent ? "bg-white/5" : ""}`}
+                    >
+                      <td className="px-3 py-2.5 text-[var(--color-muted)]">{i + 1}</td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <TeamLogo url={row.team.logoUrl} name={row.team.name} poolColor={poolData.pool.color} className="size-5 rounded" />
+                          <div>
+                            <span className={`font-semibold block leading-tight ${isCurrent ? "text-[var(--color-cream)] underline underline-offset-2 decoration-[var(--color-border-subtle)]" : ""}`}>
+                              {row.team.name}
+                            </span>
+                            {rank && <span className={`text-[9px] font-semibold ${rank.color}`}>{rank.label}</span>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-2 py-2.5 text-center text-[var(--color-muted)]">{row.played}</td>
+                      <td className="px-2 py-2.5 text-center">{row.wins}</td>
+                      <td className="px-2 py-2.5 text-center">{row.draws}</td>
+                      <td className="px-2 py-2.5 text-center">{row.losses}</td>
+                      <td className="px-2 py-2.5 text-center text-[var(--color-muted)]">
+                        {row.gd > 0 ? `+${row.gd}` : row.gd}
+                      </td>
+                      <td className="px-3 py-2.5 text-center font-black">{row.points}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Matchs de la poule ── */}
+      {poolMatches.length > 0 && poolData && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+            Matchs de la poule
+          </p>
+          <div className="space-y-1.5">
+            {poolMatches.map((pm) => {
+              const isCurrent = pm.id === match.id;
+              return (
+                <Link key={pm.id} href={`/matches/${pm.id}`}>
+                  <div className={`flex items-center gap-2 rounded-xl border-l-4 px-3 py-2 text-xs transition-colors ${
+                    isCurrent ? "bg-[var(--color-accent)]/10" : "bg-[var(--color-surface-2)]"
+                  }`} style={{ borderLeftColor: poolData.pool.color }}>
+                    {/* Team A */}
+                    <div className="flex flex-1 items-center gap-1.5 min-w-0">
+                      <TeamLogo url={pm.teamA.logoUrl} name={pm.teamA.name} poolColor={poolData.pool.color} className="size-5 rounded" />
+                      <span className={`font-semibold truncate ${pm.result === "TEAM_A" ? "text-green-400" : ""}`}>
+                        {pm.teamA.name}
+                      </span>
+                    </div>
+                    {/* Score */}
+                    <span className="shrink-0 font-black tabular-nums text-[var(--color-cream)] text-sm">
+                      {pm.status === "FINISHED" ? `${pm.scoreA} – ${pm.scoreB}` : "vs"}
+                    </span>
+                    {/* Team B */}
+                    <div className="flex flex-1 items-center gap-1.5 justify-end min-w-0">
+                      <span className={`font-semibold truncate text-right ${pm.result === "TEAM_B" ? "text-green-400" : ""}`}>
+                        {pm.teamB.name}
+                      </span>
+                      <TeamLogo url={pm.teamB.logoUrl} name={pm.teamB.name} poolColor={poolData.pool.color} className="size-5 rounded" />
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}

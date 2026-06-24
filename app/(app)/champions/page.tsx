@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { getAllTeams, getUserChampionBet } from "@/lib/data/queries";
 import { ChampionBetForm } from "./champion-bet-form";
 import { Star, Lock } from "lucide-react";
+import { TeamLogo } from "@/components/team-logo";
 
 export const metadata = { title: "Ton favori · TBT Bet" };
 export const dynamic = "force-dynamic";
@@ -36,18 +37,7 @@ export default async function ChampionBetPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            {existingBet.team.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={existingBet.team.logoUrl}
-                alt={existingBet.team.name}
-                className="size-16 rounded-xl object-contain"
-              />
-            ) : (
-              <div className="size-16 rounded-xl bg-[var(--color-surface-2)] flex items-center justify-center">
-                <Star className="size-6 text-[var(--color-accent)]" />
-              </div>
-            )}
+            <TeamLogo url={existingBet.team.logoUrl} name={existingBet.team.name} className="size-16 rounded-xl" />
             <div>
               <p className="text-[10px] text-[var(--color-muted)]">Ton équipe favorite</p>
               <p className="text-2xl font-black">{existingBet.team.name}</p>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn, dayKey, dayLabel, formatKickoffTime } from "@/lib/utils";
+import { TeamLogo } from "@/components/team-logo";
 import { Users, Swords, Trophy, Plus, Trash2, CheckCircle2, Calendar, RefreshCw, ImageIcon, Upload, Wrench, RotateCcw, Sparkles } from "lucide-react";
 
 // ── Types ──
@@ -633,10 +634,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                   {pool.teams.map((team) => (
                     <div key={team.id} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
-                        {team.logoUrl && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={team.logoUrl} alt={team.name} className="size-5 object-contain rounded" />
-                        )}
+                        <TeamLogo url={team.logoUrl} name={team.name} className="size-5 rounded" />
                         <span>{team.name}</span>
                       </div>
                       <button onClick={() => handleAssignTeamToPool(team.id, "")}

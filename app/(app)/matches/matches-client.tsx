@@ -5,7 +5,8 @@ import { Card } from "@/components/ui/card";
 import { BetForm } from "./[id]/bet-form";
 import { ChevronRight, ChevronDown, CalendarDays, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
-import { cn, dayKey, dayLabel, formatKickoffTime } from "@/lib/utils";
+import { cn, dayKey, dayLabel, formatKickoffTime, formatMatchLabel } from "@/lib/utils";
+import { TeamLogo } from "@/components/team-logo";
 import { getOddsForTeam, getOddsForDraw } from "@/lib/odds";
 import type { MatchPhase, BracketSource } from "@/lib/generated/prisma";
 
@@ -51,19 +52,27 @@ interface Props {
   jokersLeft: number;
 }
 
-// ── Constantes ─────────────────────────────────────────────────────────────
+// ── Helpers de couleur par phase ───────────────────────────────────────────
 
+const BRACKET_PHASE: Record<string, { color: string; label: string }> = {
+  WINNER_BRACKET: { color: "#22c55e", label: "WB" },
+  LOSER_BRACKET:  { color: "#f97316", label: "LB" },
+  FINAL_SERIES:   { color: "#eab308", label: "Finale" },
+};
 
-// Helpers couleur de poule (hex depuis la DB)
-function poolBadgeStyle(color: string) {
+function getPhaseStyle(phase: string, pool: { name: string; color: string } | null | undefined) {
+  if (phase === "POOL" && pool) return { color: pool.color, label: pool.name };
+  return BRACKET_PHASE[phase] ?? null;
+}
+
+function phaseBadgeStyle(color: string) {
   return { background: color + "25", color };
 }
-function poolBorderStyle(color: string) {
+function phaseBorderStyle(color: string) {
   return { borderLeftColor: color };
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
 
 function groupByDay(list: MatchForList[]) {
   const sorted = [...list].sort((a, b) => {
@@ -83,22 +92,7 @@ function groupByDay(list: MatchForList[]) {
 
 // ── Sous-composant : logo d'équipe ─────────────────────────────────────────
 
-function TeamLogo({ url, name, size = "sm" }: { url: string | null; name: string; size?: "sm" | "md" }) {
-  const cls = size === "md" ? "size-9 rounded-lg" : "size-7 rounded-md";
-  if (url) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={url} alt={name} className={cn(cls, "object-contain shrink-0")} />
-    );
-  }
-  return (
-    <div className={cn(cls, "shrink-0 bg-[var(--color-surface-2)] flex items-center justify-center")}>
-      <span className="text-[8px] font-bold text-[var(--color-muted)] uppercase leading-none text-center px-0.5">
-        {name.slice(0, 2)}
-      </span>
-    </div>
-  );
-}
+
 
 // ── Composant principal ────────────────────────────────────────────────────
 
@@ -153,7 +147,7 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
             key={id}
             onClick={() => setSelectedPool(active ? null : id)}
             className="shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-all"
-            style={active ? poolBadgeStyle(color) : undefined}
+            style={active ? phaseBadgeStyle(color) : undefined}
           >
             {name}
           </button>
@@ -175,31 +169,31 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
     const isClosed = match.bettingClosesAt != null && new Date(match.bettingClosesAt) <= new Date();
     const canBet = !isClosed;
     const isExpanded = expandedId === match.id;
-    const pool = match.teamA.pool;
+    const phaseStyle = getPhaseStyle(match.phase, match.teamA.pool);
 
     return (
       <div>
         <Card
           className={cn(
             "overflow-hidden transition-colors",
-            match.phase === "POOL" && pool ? "border-l-4" : "",
+            phaseStyle ? "border-l-4" : "",
             canBet ? "cursor-pointer hover:border-[var(--color-accent)]/30" : "",
             isExpanded ? "border-[var(--color-accent)]/40 rounded-b-none" : ""
           )}
-          style={match.phase === "POOL" && pool ? poolBorderStyle(pool.color) : undefined}
+          style={phaseStyle ? phaseBorderStyle(phaseStyle.color) : undefined}
           onClick={() => canBet && toggle(match.id)}
         >
           <div className="p-3">
             {/* Header */}
             <div className="flex items-center justify-between mb-2.5 gap-2">
               <div className="flex items-center gap-1.5 min-w-0">
-                {pool && (
+                {phaseStyle && (
                   <span className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold"
-                    style={poolBadgeStyle(pool.color)}>
-                    {pool.name}
+                    style={phaseBadgeStyle(phaseStyle.color)}>
+                    {phaseStyle.label}
                   </span>
                 )}
-                <span className="text-[10px] text-[var(--color-muted)] truncate">{match.label}</span>
+                <span className="text-[10px] text-[var(--color-muted)] truncate">{formatMatchLabel(match.label)}</span>
                 {match.status === "LIVE" && (
                   <span className="flex shrink-0 items-center gap-1 text-[9px] text-red-400">
                     <span className="size-1.5 rounded-full bg-red-500 animate-pulse" /> LIVE
@@ -230,7 +224,7 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
               <div className="flex items-center gap-1">
                 {/* Team A */}
                 <div className="flex-1 flex items-center gap-2 min-w-0">
-                  <TeamLogo url={match.teamA.logoUrl} name={match.teamA.name} size="md" />
+                  <TeamLogo url={match.teamA.logoUrl} name={match.teamA.name} poolColor={match.teamA.pool?.color} className="size-9 rounded-lg" />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold truncate leading-tight">{match.teamA.name}</p>
                     <p className="text-[10px] font-bold text-[var(--color-accent)]">×{oddsA}</p>
@@ -253,7 +247,7 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
                     <p className="text-sm font-semibold truncate leading-tight">{match.teamB.name}</p>
                     <p className="text-[10px] font-bold text-[var(--color-accent)]">×{oddsB}</p>
                   </div>
-                  <TeamLogo url={match.teamB.logoUrl} name={match.teamB.name} size="md" />
+                  <TeamLogo url={match.teamB.logoUrl} name={match.teamB.name} poolColor={match.teamB.pool?.color} className="size-9 rounded-lg" />
                 </div>
               </div>
             )}
@@ -262,7 +256,7 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
 
         {/* Formulaire inline */}
         {isExpanded && canBet && (
-          <div className="rounded-b-xl border border-t-0 border-[var(--color-accent)]/40 bg-[var(--color-surface-1)] px-4 py-5">
+          <div className="rounded-b-xl border border-t-0 border-[var(--color-accent)]/40 bg-[var(--color-surface-1)] px-3 py-3">
             <BetForm
               matchId={match.id}
               teamA={match.teamA.name}
@@ -288,24 +282,24 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
     const bet = betMap[match.id];
     const betWon = bet?.settled && bet.payout != null && bet.payout > 0;
     const betLost = bet?.settled && bet.payout != null && bet.payout === 0;
-    const pool = match.teamA.pool;
+    const phaseStyle = getPhaseStyle(match.phase, match.teamA.pool);
 
     return (
       <Link href={`/matches/${match.id}`}>
         <Card
-          className={cn("p-3 overflow-hidden", match.phase === "POOL" && pool ? "border-l-4" : "")}
-          style={match.phase === "POOL" && pool ? poolBorderStyle(pool.color) : undefined}
+          className={cn("p-3 overflow-hidden", phaseStyle ? "border-l-4" : "")}
+          style={phaseStyle ? phaseBorderStyle(phaseStyle.color) : undefined}
         >
           {/* Header */}
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-1.5">
-              {pool && (
+              {phaseStyle && (
                 <span className="rounded-full px-2 py-0.5 text-[9px] font-semibold"
-                  style={poolBadgeStyle(pool.color)}>
-                  {pool.name}
+                  style={phaseBadgeStyle(phaseStyle.color)}>
+                  {phaseStyle.label}
                 </span>
               )}
-              <span className="text-[10px] text-[var(--color-muted)]">{match.label}</span>
+              <span className="text-[10px] text-[var(--color-muted)]">{formatMatchLabel(match.label)}</span>
             </div>
             {betWon && (
               <span className="text-[9px] font-semibold text-green-400">
@@ -323,7 +317,7 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
           <div className="flex items-center gap-1">
             {/* Team A */}
             <div className="flex-1 flex items-center gap-2 min-w-0">
-              <TeamLogo url={match.teamA.logoUrl} name={match.teamA.name} />
+              <TeamLogo url={match.teamA.logoUrl} name={match.teamA.name} poolColor={match.teamA.pool?.color} className="size-7 rounded-md" />
               <span className={cn(
                 "text-sm font-semibold truncate",
                 match.result === "TEAM_A" ? "text-[var(--color-accent)]" : "text-[var(--color-cream)]"
@@ -345,7 +339,7 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
               )}>
                 {match.teamB.name}
               </span>
-              <TeamLogo url={match.teamB.logoUrl} name={match.teamB.name} />
+              <TeamLogo url={match.teamB.logoUrl} name={match.teamB.name} poolColor={match.teamB.pool?.color} className="size-7 rounded-md" />
             </div>
           </div>
 

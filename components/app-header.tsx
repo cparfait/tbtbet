@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { User, LogOut, Settings } from "lucide-react";
+import { UserAvatar } from "@/components/user-avatar";
 
 interface AppHeaderProps {
   user: {
@@ -17,38 +18,6 @@ interface AppHeaderProps {
   };
 }
 
-function Avatar({ name, src, size = 32 }: { name: string | null; src: string | null; size?: number }) {
-  const initials = (name ?? "?")
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
-  if (src) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={src}
-        alt={name ?? "avatar"}
-        width={size}
-        height={size}
-        className="rounded-full object-cover ring-2 ring-[var(--color-accent)]/30"
-        style={{ width: size, height: size }}
-        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-      />
-    );
-  }
-
-  return (
-    <span
-      className="flex items-center justify-center rounded-full bg-[var(--color-accent)]/20 font-bold text-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/30"
-      style={{ width: size, height: size, fontSize: size * 0.38 }}
-    >
-      {initials}
-    </span>
-  );
-}
 
 export function AppHeader({ user }: AppHeaderProps) {
   const pathname = usePathname();
@@ -96,7 +65,7 @@ export function AppHeader({ user }: AppHeaderProps) {
           aria-label="Menu utilisateur"
           className="relative flex items-center"
         >
-          <Avatar name={user.name} src={avatarSrc} size={34} />
+          <UserAvatar src={avatarSrc} name={user.name} className="size-[34px]" />
           {user.role === "ADMIN" && (
             <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-[var(--color-accent)] ring-1 ring-[var(--color-bg)]" />
           )}
@@ -107,7 +76,7 @@ export function AppHeader({ user }: AppHeaderProps) {
           <div className="absolute right-0 top-[calc(100%+8px)] w-52 rounded-2xl glass-strong shadow-xl shadow-black/40 overflow-hidden border border-[var(--color-border-subtle)]">
             {/* Info utilisateur */}
             <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[var(--color-border-subtle)]">
-              <Avatar name={user.name} src={avatarSrc} size={36} />
+              <UserAvatar src={avatarSrc} name={user.name} className="size-9" />
               <div className="min-w-0">
                 <p className="text-sm font-semibold truncate text-[var(--color-cream)]">
                   {user.name || "Anonyme"}

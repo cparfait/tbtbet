@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { User, LogOut, Settings } from "lucide-react";
-import Image from "next/image";
+import { UserAvatar } from "@/components/user-avatar";
 
 interface UserAvatarMenuProps {
   user: {
@@ -18,37 +18,6 @@ interface UserAvatarMenuProps {
   };
 }
 
-function Avatar({ name, src, size = 32 }: { name: string | null; src: string | null; size?: number }) {
-  const initials = (name ?? "?")
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
-  if (src) {
-    return (
-      <Image
-        src={src}
-        alt={name ?? "avatar"}
-        width={size}
-        height={size}
-        className="rounded-full object-cover ring-2 ring-[var(--color-accent)]/30"
-        style={{ width: size, height: size }}
-        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-      />
-    );
-  }
-
-  return (
-    <span
-      className="flex items-center justify-center rounded-full bg-[var(--color-accent)]/20 font-bold text-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/30"
-      style={{ width: size, height: size, fontSize: size * 0.38 }}
-    >
-      {initials}
-    </span>
-  );
-}
 
 export function UserAvatarMenu({ user }: UserAvatarMenuProps) {
   const pathname = usePathname();
@@ -78,7 +47,7 @@ export function UserAvatarMenu({ user }: UserAvatarMenuProps) {
         aria-label="Menu utilisateur"
         className="relative flex items-center"
       >
-        <Avatar name={user.name} src={avatarSrc} size={42} />
+        <UserAvatar src={avatarSrc} name={user.name} className="size-[42px]" />
         {user.role === "ADMIN" && (
           <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-[var(--color-accent)] ring-1 ring-[var(--color-bg)]" />
         )}
@@ -88,7 +57,7 @@ export function UserAvatarMenu({ user }: UserAvatarMenuProps) {
         <div className="absolute right-0 top-[calc(100%+8px)] w-52 rounded-2xl glass-strong shadow-xl shadow-black/40 overflow-hidden border border-[var(--color-border-subtle)] z-50">
           {/* Info utilisateur */}
           <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[var(--color-border-subtle)]">
-            <Avatar name={user.name} src={avatarSrc} size={36} />
+            <UserAvatar src={avatarSrc} name={user.name} className="size-9" />
             <div className="min-w-0">
               <p className="text-sm font-semibold truncate text-[var(--color-cream)]">
                 {user.name || "Anonyme"}

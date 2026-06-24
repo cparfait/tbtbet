@@ -82,20 +82,20 @@ export function BetForm({
   const choices: BetChoice[] = allowDraw ? ["TEAM_A", "DRAW", "TEAM_B"] : ["TEAM_A", "TEAM_B"];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* Solde */}
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">
+        <p className="text-xs font-semibold">
           {existingBet ? "Modifier mon pari" : "Placer un pari"}
         </p>
-        <p className="flex items-center gap-1 text-xs text-[var(--color-muted)]">
-          <Zap className="size-3.5 text-[var(--color-accent)]" />
+        <p className="flex items-center gap-1 text-[10px] text-[var(--color-muted)]">
+          <Zap className="size-3 text-[var(--color-accent)]" />
           {userWizz} Wizz
         </p>
       </div>
 
       {/* Choix */}
-      <div className={cn("grid gap-2", allowDraw ? "grid-cols-3" : "grid-cols-2")}>
+      <div className={cn("grid gap-1.5", allowDraw ? "grid-cols-3" : "grid-cols-2")}>
         {choices.map((c) => {
           const label = c === "TEAM_A" ? teamA : c === "TEAM_B" ? teamB : "Nul";
           const logo = c === "TEAM_A" ? teamALogo : c === "TEAM_B" ? teamBLogo : null;
@@ -105,7 +105,7 @@ export function BetForm({
               key={c}
               onClick={() => setChoice(c)}
               className={cn(
-                "flex flex-col items-center gap-2 rounded-2xl border-2 py-4 text-center transition-all",
+                "flex flex-col items-center gap-1.5 rounded-xl border-2 py-2.5 text-center transition-all",
                 active
                   ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10"
                   : "border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] hover:border-[var(--color-accent)]/40"
@@ -113,15 +113,15 @@ export function BetForm({
             >
               {logo ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={logo} alt={label} className="size-10 object-contain rounded-lg" />
+                <img src={logo} alt={label} className="size-8 object-contain rounded-lg" />
               ) : (
-                <div className={cn("size-10 rounded-xl", active ? "bg-[var(--color-accent)]/20" : "bg-[var(--color-surface-1)]")} />
+                <div className={cn("size-8 rounded-lg", active ? "bg-[var(--color-accent)]/20" : "bg-[var(--color-surface-1)]")} />
               )}
               <div>
-                <p className={cn("text-xs font-bold px-1 leading-tight", active ? "text-[var(--color-accent)]" : "")}>
+                <p className={cn("text-[10px] font-bold px-1 leading-tight", active ? "text-[var(--color-accent)]" : "")}>
                   {label}
                 </p>
-                <p className={cn("text-sm font-black mt-0.5", active ? "text-[var(--color-accent)]" : "text-[var(--color-muted)]")}>
+                <p className={cn("text-xs font-black mt-0.5", active ? "text-[var(--color-accent)]" : "text-[var(--color-muted)]")}>
                   ×{oddsMap[c]}
                 </p>
               </div>
@@ -132,9 +132,9 @@ export function BetForm({
 
       {/* Mise — slider */}
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-xs text-[var(--color-muted)]">Mise</label>
-          <span className="text-base font-black text-[var(--color-cream)]">{amount} Wizz</span>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-[10px] text-[var(--color-muted)]">Mise</label>
+          <span className="text-sm font-black text-[var(--color-cream)]">{amount} Wizz</span>
         </div>
         <input
           type="range"
@@ -142,9 +142,9 @@ export function BetForm({
           max={userWizz}
           value={amount}
           onChange={(e) => setAmount(Number(e.target.value))}
-          className="w-full accent-[var(--color-accent)] h-2 cursor-pointer"
+          className="w-full accent-[var(--color-accent)] h-1.5 cursor-pointer"
         />
-        <div className="flex justify-between mt-1 text-[10px] text-[var(--color-muted)]">
+        <div className="flex justify-between mt-1 text-[9px] text-[var(--color-muted)]">
           <span>1</span>
           <span>{userWizz} max</span>
         </div>
@@ -155,19 +155,19 @@ export function BetForm({
         <button
           onClick={() => setJokerUsed(!jokerUsed)}
           className={cn(
-            "w-full flex items-center justify-between rounded-xl border-2 px-4 py-3 text-sm transition-all",
+            "w-full flex items-center justify-between rounded-xl border-2 px-3 py-2 transition-all",
             jokerUsed
               ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10"
               : "border-[var(--color-border-subtle)] bg-[var(--color-surface-2)]"
           )}
         >
           <div className="flex items-center gap-2">
-            <span className="text-base">🃏</span>
+            <span className="text-sm">🃏</span>
             <div className="text-left">
-              <p className={cn("text-sm font-semibold", jokerUsed ? "text-[var(--color-accent)]" : "")}>
+              <p className={cn("text-xs font-semibold", jokerUsed ? "text-[var(--color-accent)]" : "")}>
                 Joker ×2
               </p>
-              <p className="text-[10px] text-[var(--color-muted)]">
+              <p className="text-[9px] text-[var(--color-muted)]">
                 {jokersLeft} restant{jokersLeft > 1 ? "s" : ""}
               </p>
             </div>
@@ -179,26 +179,26 @@ export function BetForm({
       )}
 
       {/* Gain potentiel */}
-      <div className="flex items-center justify-between rounded-xl bg-[var(--color-surface-2)] px-4 py-3">
+      <div className="flex items-center justify-between rounded-xl bg-[var(--color-surface-2)] px-3 py-2">
         <div>
-          <p className="text-xs text-[var(--color-muted)]">Gain potentiel</p>
-          <p className="text-2xl font-black text-[var(--color-accent)]">+{potentialGain} Wizz</p>
+          <p className="text-[9px] text-[var(--color-muted)]">Gain potentiel</p>
+          <p className="text-lg font-black text-[var(--color-accent)]">+{potentialGain} Wizz</p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] text-[var(--color-muted)]">cote ×{effectiveOdds}</p>
-          <p className="text-sm font-semibold">{potentialPayout} récupérés</p>
+          <p className="text-[9px] text-[var(--color-muted)]">cote ×{effectiveOdds}</p>
+          <p className="text-xs font-semibold">{potentialPayout} récupérés</p>
         </div>
       </div>
 
       {error && (
-        <p className="rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>
+        <p className="rounded-xl bg-red-500/10 px-3 py-2 text-xs text-red-400">{error}</p>
       )}
 
       <button
         onClick={handleSubmit}
         disabled={submitting || success || amount < 1 || amount > userWizz}
         className={cn(
-          "w-full rounded-2xl py-4 text-base font-black transition-all",
+          "w-full rounded-2xl py-3 text-sm font-black transition-all",
           success
             ? "bg-green-500 text-white"
             : "bg-[var(--color-accent)] text-black hover:brightness-110 disabled:opacity-40"

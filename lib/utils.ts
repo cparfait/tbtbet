@@ -44,6 +44,25 @@ export function dayKey(date: Date | string): string {
   }).format(d);
 }
 
+/** Retourne le label de destination WB/LB selon le rang dans la poule.
+ *  Renvoie null si aucun match n'a encore été joué (anyPlayed=false). */
+export function poolRankLabel(rank: number, anyPlayed: boolean): { label: string; color: string } | null {
+  if (!anyPlayed) return null;
+  if (rank <= 1) return { label: "→ WB", color: "text-green-400" };
+  return { label: "→ LB", color: "text-orange-400" };
+}
+
+/** Traduit un label de match stocké en DB vers un libellé lisible.
+ *  "WB R1 — Équipe A vs Équipe B" → "Winners Bracket · Round 1"
+ *  Supprime la partie équipes (après " — "). */
+export function formatMatchLabel(label: string | null | undefined): string {
+  if (!label) return "";
+  const phase = label.split(" — ")[0] ?? label;
+  return phase
+    .replace(/^WB\s+R(\d+)$/i, (_, n) => `Winners Bracket · Round ${n}`)
+    .replace(/^LB\s+R(\d+)$/i, (_, n) => `Loser Bracket · Round ${n}`);
+}
+
 /** Libellé lisible d'un jour (ex. "Aujourd'hui", "Demain", "ven. 14 juin"). */
 export function dayLabel(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;

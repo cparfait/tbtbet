@@ -92,13 +92,27 @@ export async function getMatchById(id: string) {
   return prisma.match.findUnique({
     where: { id },
     include: {
-      teamA: true,
-      teamB: true,
+      teamA: { include: { pool: true } },
+      teamB: { include: { pool: true } },
       finalSeries: true,
       bets: {
         include: { user: { select: { id: true, name: true, avatarUrl: true } } },
       },
     },
+  });
+}
+
+export async function getPoolMatchesByPoolId(poolId: string) {
+  return prisma.match.findMany({
+    where: {
+      phase: "POOL",
+      OR: [{ teamA: { poolId } }, { teamB: { poolId } }],
+    },
+    include: {
+      teamA: true,
+      teamB: true,
+    },
+    orderBy: { scheduledAt: "asc" },
   });
 }
 
@@ -385,6 +399,14 @@ export async function getFinalSeries() {
       },
     },
   });
+}
+
+export async function getTournamentChampion() {
+  const series = await prisma.finalSeries.findFirst({
+    where: { winnerTeamId: { not: null } },
+  });
+  if (!series?.winnerTeamId) return null;
+  return prisma.team.findUnique({ where: { id: series.winnerTeamId } });
 }
 
 // ─────────────────────────────────────────────
