@@ -76,7 +76,9 @@ export default async function DashboardPage() {
 
   const upcomingMatches = (() => {
     if (todayMatches.length > 0 || matches.length === 0) return [];
-    const firstDate = new Date(matches[0].scheduledAt!);
+    const firstScheduledAt = matches[0]?.scheduledAt;
+    if (!firstScheduledAt) return [];
+    const firstDate = new Date(firstScheduledAt);
     const dayStart = new Date(firstDate.getFullYear(), firstDate.getMonth(), firstDate.getDate());
     const dayEnd = new Date(firstDate.getFullYear(), firstDate.getMonth(), firstDate.getDate(), 23, 59, 59);
     return matches.filter((m) => {

@@ -5,7 +5,7 @@ import { getMatchById, getUserBetForMatch, getUserById, getPoolStandings, getPoo
 import { getOddsForTeam, getOddsForDraw } from "@/lib/odds";
 import { BetForm } from "./bet-form";
 import Link from "next/link";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, Lock, ChevronRight } from "lucide-react";
 import { formatMatchLabel, poolRankLabel } from "@/lib/utils";
 import { TeamLogo } from "@/components/team-logo";
 
