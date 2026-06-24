@@ -3,8 +3,16 @@ import { auth } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { getUserById, getUserChampionBet, getUserBets } from "@/lib/data/queries";
+import { TeamLogo } from "@/components/team-logo";
 import { ProfileForm } from "./profile-form";
-import { Zap, Target, Trophy } from "lucide-react";
+import { Zap, Target, Trophy, TrendingUp, TrendingDown, Clock } from "lucide-react";
+
+const PHASE_LABEL: Record<string, string> = {
+  POOL: "Phase de poules",
+  WINNER_BRACKET: "Winners",
+  LOSER_BRACKET: "Losers",
+  FINAL_SERIES: "Finale",
+};
 
 export const metadata = { title: "Mon profil · TBT Bet" };
 export const dynamic = "force-dynamic";
@@ -93,6 +101,86 @@ export default async function ProfilePage() {
           </div>
         </Card>
       )}
+
+      {/* Mes paris */}
+      <div>
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+          Mes paris ({bets.length})
+        </h2>
+        {bets.length === 0 ? (
+          <Card className="p-6 text-center">
+            <p className="text-sm text-[var(--color-muted)]">Aucun pari pour l&apos;instant.</p>
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {bets.map((bet) => {
+              const won = bet.settled && bet.payout !== null && bet.payout > bet.amountWizz;
+              const lost = bet.settled && (bet.payout === null || bet.payout === 0);
+              const chosenTeam =
+                bet.choice === "TEAM_A"
+                  ? bet.match.teamA
+                  : bet.choice === "TEAM_B"
+                  ? bet.match.teamB
+                  : null;
+              const profit =
+                bet.payout !== null ? bet.payout - bet.amountWizz : null;
+              return (
+                <Card key={bet.id} className="p-3">
+                  <div className="flex items-start gap-3">
+                    {/* Logos équipes */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <TeamLogo url={bet.match.teamA.logoUrl} name={bet.match.teamA.name} className="size-8 rounded-md" />
+                      <span className="text-[10px] text-[var(--color-muted)] font-bold">VS</span>
+                      <TeamLogo url={bet.match.teamB?.logoUrl ?? null} name={bet.match.teamB?.name ?? "?"} className="size-8 rounded-md" />
+                    </div>
+
+                    {/* Infos */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-[var(--color-muted)] mb-0.5">
+                        {PHASE_LABEL[bet.match.phase] ?? bet.match.phase}
+                        {bet.match.label ? ` · ${bet.match.label}` : ""}
+                      </p>
+                      <p className="text-xs font-semibold truncate">
+                        {bet.match.teamA.name} vs {bet.match.teamB?.name ?? "À déterminer"}
+                      </p>
+                      <p className="text-[10px] text-[var(--color-muted)] mt-0.5">
+                        Misé sur{" "}
+                        <span className="text-[var(--color-cream)] font-medium">
+                          {chosenTeam?.name ?? "Nul"}
+                        </span>
+                        {" · "}
+                        {bet.amountWizz} Wizz
+                        {bet.jokerUsed && " · 🃏"}
+                      </p>
+                    </div>
+
+                    {/* Résultat */}
+                    <div className="shrink-0 text-right">
+                      {!bet.settled ? (
+                        <span className="flex items-center gap-1 text-[10px] text-[var(--color-muted)]">
+                          <Clock className="size-3" /> En attente
+                        </span>
+                      ) : won ? (
+                        <span className="flex items-center gap-1 text-[10px] text-green-400 font-semibold">
+                          <TrendingUp className="size-3" />
+                          +{profit} Wizz
+                        </span>
+                      ) : lost ? (
+                        <span className="flex items-center gap-1 text-[10px] text-red-400 font-semibold">
+                          <TrendingDown className="size-3" />
+                          -{bet.amountWizz} Wizz
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[var(--color-muted)]">Remboursé</span>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
     </div>
   );

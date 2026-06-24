@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Image from "next/image";
 import { auth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
@@ -60,25 +59,29 @@ export default async function DashboardPage() {
       ? Math.round((wonBets.length / settledBets.length) * 100)
       : null;
 
-  const nextMatch = matches[0] ?? null;
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+  const todayMatches = matches.filter((m) => {
+    if (!m.scheduledAt) return false;
+    const d = new Date(m.scheduledAt);
+    return d >= todayStart && d <= todayEnd;
+  });
+
+  const futureMatchCount = matches.filter((m) => {
+    if (!m.scheduledAt) return false;
+    return new Date(m.scheduledAt) > todayEnd;
+  }).length;
+
+  const nextMatch = todayMatches.length === 0 ? (matches[0] ?? null) : null;
 
   const firstName = user.name?.split(" ")[0] ?? "Joueur";
 
   return (
     <div className="space-y-5 pt-1">
       <PageHeader
-        title={
-          <span className="inline-flex items-center gap-2">
-            Salut {firstName}
-            <Image
-              src="/logo.png"
-              alt="TBT Bet"
-              width={30}
-              height={30}
-              className="inline-block drop-shadow-[0_0_6px_var(--color-accent)]/40"
-            />
-          </span>
-        }
+        title={`Salut ${firstName}`}
         subtitle="Prêt à parier ?"
         action={
           <UserAvatarMenu
@@ -121,7 +124,20 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* Champion du tournoi OU Prochain match */}
+      {/* Ton favori — informatif uniquement si pari champion placé */}
+      {!champion && championBet && (
+        <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border-subtle)] px-4 py-3">
+          <Star className="size-4 text-[var(--color-accent)] shrink-0" />
+          <p className="text-sm text-[var(--color-muted)]">
+            Tes favoris sont{" "}
+            <span className="font-semibold text-[var(--color-cream)]">
+              {championBet.team.name}
+            </span>
+          </p>
+        </div>
+      )}
+
+      {/* Champion du tournoi OU Matchs du jour / Prochain match */}
       {champion ? (
         <div>
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
@@ -164,22 +180,58 @@ export default async function DashboardPage() {
       ) : (
         <div>
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
-            Prochain match
+            {todayMatches.length > 0
+              ? `Matchs du jour (${todayMatches.length})`
+              : "Prochain match"}
           </h2>
-          {nextMatch ? (
+
+          {todayMatches.length > 0 ? (
+            <div className="space-y-3">
+              {todayMatches.map((match) => {
+                const oddsA = getOddsForTeam(match.phase, match.teamASource, match.teamBSource, match.teamA.wins);
+                const oddsB = getOddsForTeam(match.phase, match.teamBSource, match.teamASource, match.teamB?.wins ?? 0);
+                return (
+                  <Link key={match.id} href={`/matches/${match.id}`}>
+                    <Card className="p-4 hover:border-[var(--color-accent)]/40 transition-colors">
+                      <p className="text-[10px] uppercase tracking-wider text-[var(--color-muted)] mb-3">
+                        {match.label}&nbsp;·&nbsp;
+                        {PHASE_LABEL[match.phase] ?? match.phase}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 text-center">
+                          <TeamLogo url={match.teamA.logoUrl} name={match.teamA.name} className="size-10 mx-auto mb-1.5 rounded-lg" />
+                          <p className="text-sm font-bold truncate">{match.teamA.name}</p>
+                          <p className="text-[10px] text-[var(--color-muted)]">{SOURCE_LABEL[match.teamASource]}</p>
+                          <p className="text-xs font-semibold text-[var(--color-accent)] mt-0.5">x{oddsA}</p>
+                        </div>
+                        <div className="text-center shrink-0 w-16">
+                          <p className="text-sm font-bold text-[var(--color-muted)]">VS</p>
+                          {match.scheduledAt && (
+                            <p className="text-[9px] text-[var(--color-muted)] mt-1 leading-tight">
+                              {new Date(match.scheduledAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex-1 text-center">
+                          <TeamLogo url={match.teamB?.logoUrl ?? null} name={match.teamB?.name ?? "?"} className="size-10 mx-auto mb-1.5 rounded-lg" />
+                          <p className="text-sm font-bold truncate">{match.teamB?.name ?? "À déterminer"}</p>
+                          <p className="text-[10px] text-[var(--color-muted)]">{SOURCE_LABEL[match.teamBSource]}</p>
+                          <p className="text-xs font-semibold text-[var(--color-accent)] mt-0.5">x{oddsB}</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex items-center justify-center gap-1 rounded-lg bg-[var(--color-accent)]/10 py-2 text-sm font-medium text-[var(--color-accent)]">
+                        Parier sur ce match
+                        <ChevronRight className="size-4" />
+                      </div>
+                    </Card>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : nextMatch ? (
             (() => {
-              const oddsA = getOddsForTeam(
-                nextMatch.phase,
-                nextMatch.teamASource,
-                nextMatch.teamBSource,
-                nextMatch.teamA.wins
-              );
-              const oddsB = getOddsForTeam(
-                nextMatch.phase,
-                nextMatch.teamBSource,
-                nextMatch.teamASource,
-                nextMatch.teamB?.wins ?? 0
-              );
+              const oddsA = getOddsForTeam(nextMatch.phase, nextMatch.teamASource, nextMatch.teamBSource, nextMatch.teamA.wins);
+              const oddsB = getOddsForTeam(nextMatch.phase, nextMatch.teamBSource, nextMatch.teamASource, nextMatch.teamB?.wins ?? 0);
               return (
                 <Link href={`/matches/${nextMatch.id}`}>
                   <Card className="p-4 hover:border-[var(--color-accent)]/40 transition-colors">
@@ -188,74 +240,30 @@ export default async function DashboardPage() {
                       {PHASE_LABEL[nextMatch.phase] ?? nextMatch.phase}
                     </p>
                     <div className="flex items-center gap-2">
-                      {/* Équipe A */}
                       <div className="flex-1 text-center">
-                        {nextMatch.teamA.logoUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={nextMatch.teamA.logoUrl}
-                            alt={nextMatch.teamA.name}
-                            className="size-10 object-contain mx-auto mb-1.5 rounded"
-                          />
-                        ) : (
-                          <div className="size-10 rounded-lg bg-[var(--color-surface-2)] mx-auto mb-1.5" />
-                        )}
-                        <p className="text-sm font-bold truncate">
-                          {nextMatch.teamA.name}
-                        </p>
-                        <p className="text-[10px] text-[var(--color-muted)]">
-                          {SOURCE_LABEL[nextMatch.teamASource]}
-                        </p>
-                        <p className="text-xs font-semibold text-[var(--color-accent)] mt-0.5">
-                          x{oddsA}
-                        </p>
+                        <TeamLogo url={nextMatch.teamA.logoUrl} name={nextMatch.teamA.name} className="size-10 mx-auto mb-1.5 rounded-lg" />
+                        <p className="text-sm font-bold truncate">{nextMatch.teamA.name}</p>
+                        <p className="text-[10px] text-[var(--color-muted)]">{SOURCE_LABEL[nextMatch.teamASource]}</p>
+                        <p className="text-xs font-semibold text-[var(--color-accent)] mt-0.5">x{oddsA}</p>
                       </div>
-
-                      {/* VS + date */}
                       <div className="text-center shrink-0 w-16">
-                        <p className="text-sm font-bold text-[var(--color-muted)]">
-                          VS
-                        </p>
+                        <p className="text-sm font-bold text-[var(--color-muted)]">VS</p>
                         {nextMatch.scheduledAt && (
                           <p className="text-[9px] text-[var(--color-muted)] mt-1 leading-tight">
-                            {new Date(nextMatch.scheduledAt).toLocaleDateString(
-                              "fr-FR",
-                              {
-                                weekday: "short",
-                                day: "numeric",
-                                month: "short",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              }
-                            )}
+                            {new Date(nextMatch.scheduledAt).toLocaleDateString("fr-FR", {
+                              weekday: "short", day: "numeric", month: "short",
+                              hour: "2-digit", minute: "2-digit",
+                            })}
                           </p>
                         )}
                       </div>
-
-                      {/* Équipe B */}
                       <div className="flex-1 text-center">
-                        {nextMatch.teamB?.logoUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={nextMatch.teamB.logoUrl}
-                            alt={nextMatch.teamB.name}
-                            className="size-10 object-contain mx-auto mb-1.5 rounded"
-                          />
-                        ) : (
-                          <div className="size-10 rounded-lg bg-[var(--color-surface-2)] mx-auto mb-1.5" />
-                        )}
-                        <p className="text-sm font-bold truncate">
-                          {nextMatch.teamB?.name ?? "À déterminer"}
-                        </p>
-                        <p className="text-[10px] text-[var(--color-muted)]">
-                          {SOURCE_LABEL[nextMatch.teamBSource]}
-                        </p>
-                        <p className="text-xs font-semibold text-[var(--color-accent)] mt-0.5">
-                          x{oddsB}
-                        </p>
+                        <TeamLogo url={nextMatch.teamB?.logoUrl ?? null} name={nextMatch.teamB?.name ?? "?"} className="size-10 mx-auto mb-1.5 rounded-lg" />
+                        <p className="text-sm font-bold truncate">{nextMatch.teamB?.name ?? "À déterminer"}</p>
+                        <p className="text-[10px] text-[var(--color-muted)]">{SOURCE_LABEL[nextMatch.teamBSource]}</p>
+                        <p className="text-xs font-semibold text-[var(--color-accent)] mt-0.5">x{oddsB}</p>
                       </div>
                     </div>
-
                     <div className="mt-4 flex items-center justify-center gap-1 rounded-lg bg-[var(--color-accent)]/10 py-2 text-sm font-medium text-[var(--color-accent)]">
                       Parier sur ce match
                       <ChevronRight className="size-4" />
@@ -267,9 +275,7 @@ export default async function DashboardPage() {
           ) : (
             <Card className="p-6 text-center">
               <Clock className="size-8 mx-auto mb-2 text-[var(--color-muted)]" />
-              <p className="text-sm text-[var(--color-muted)]">
-                Aucun match à venir.
-              </p>
+              <p className="text-sm text-[var(--color-muted)]">Aucun match à venir.</p>
             </Card>
           )}
         </div>
@@ -330,39 +336,13 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Ton favori */}
-      <Card className={`p-4 ${!championBet ? "animate-pulse-gold border border-[var(--color-accent)]/30" : ""}`}>
-        <div className="flex items-center gap-3">
-          <Star className={`size-5 text-[var(--color-accent)] shrink-0 ${!championBet ? "animate-float" : ""}`} />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">Ton favori</p>
-            <p className="text-xs text-[var(--color-muted)] truncate">
-              {championBet
-                ? `Tu as misé sur ${championBet.team.name}`
-                : "Quelle équipe va tout écraser ?"}
-            </p>
-          </div>
-          <Link
-            href="/champions"
-            className="shrink-0 rounded-lg bg-[var(--color-accent)]/10 px-3 py-1.5 text-xs font-medium text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20 transition-colors"
-          >
-            {championBet ? "Modifier" : "Parier"}
-          </Link>
-        </div>
-      </Card>
-
-      {/* Lien tous les matchs */}
-      {matches.length > 1 && (
-        <Link
-          href="/matches"
-          className="flex items-center justify-between rounded-xl border border-[var(--color-border-subtle)] px-4 py-3 text-sm text-[var(--color-muted)] hover:border-[var(--color-accent)]/30 hover:text-[var(--color-cream)] transition-colors"
-        >
-          <span>
-            {matches.length - 1} autre{matches.length > 2 ? "s" : ""} match
-            {matches.length > 2 ? "s" : ""} à venir
-          </span>
-          <ChevronRight className="size-4 shrink-0" />
-        </Link>
+      {/* Matchs à venir — texte informatif, pas de lien */}
+      {!champion && futureMatchCount > 0 && (
+        <p className="text-center text-xs text-[var(--color-muted)] py-1">
+          Il reste encore{" "}
+          {futureMatchCount} autre{futureMatchCount > 1 ? "s" : ""} match
+          {futureMatchCount > 1 ? "s" : ""} à venir — garde des Wizz !
+        </p>
       )}
     </div>
   );

@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import {
   Home,
-  CalendarDays,
   Trophy,
   MessageCircle,
   ShieldCheck,
@@ -14,7 +13,6 @@ import { cn } from "@/lib/utils";
 
 const BASE_ITEMS = [
   { href: "/dashboard", label: "Accueil", icon: Home },
-  { href: "/matches", label: "Matchs", icon: CalendarDays },
   { href: "/leaderboard", label: "Classement", icon: Trophy },
   { href: "/chat", label: "Chat", icon: MessageCircle },
 ] as const;
