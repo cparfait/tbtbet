@@ -22,7 +22,7 @@
 #
 # Variables obligatoires (onglet Env de Portainer) :
 #   AUTH_SECRET       = openssl rand -base64 32
-#   AUTH_URL          = https://tbt.cparfait.ovh   ← URL publique
+#   AUTH_URL          = https://tbtbet.cparfait.ovh   ← URL publique
 #   ADMIN_EMAIL       = admin@example.com
 #   ADMIN_PASSWORD    = (mot de passe admin initial)
 #   POSTGRES_PASSWORD = (mot de passe sécurisé)
@@ -79,8 +79,8 @@ services:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-tbtbet}:${POSTGRES_PASSWORD:-tbtbet_secret}@db:5432/${POSTGRES_DB:-tbtbet}?schema=public"
       DIRECT_URL: "postgresql://${POSTGRES_USER:-tbtbet}:${POSTGRES_PASSWORD:-tbtbet_secret}@db:5432/${POSTGRES_DB:-tbtbet}?schema=public"
       AUTH_SECRET: "${AUTH_SECRET}"
-      AUTH_URL: "${AUTH_URL:-https://tbt.cparfait.ovh}"
-      NEXTAUTH_URL: "${AUTH_URL:-https://tbt.cparfait.ovh}"
+      AUTH_URL: "${AUTH_URL:-https://tbtbet.cparfait.ovh}"
+      NEXTAUTH_URL: "${AUTH_URL:-https://tbtbet.cparfait.ovh}"
       AUTH_GOOGLE_ID: "${AUTH_GOOGLE_ID:-}"
       AUTH_GOOGLE_SECRET: "${AUTH_GOOGLE_SECRET:-}"
       ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@tbtbet.fr}"
