@@ -7,6 +7,7 @@ import { Trophy, ChevronRight, Users, ArrowUp, ArrowDown, Minus } from "lucide-r
 import Link from "next/link";
 import { cn, poolRankLabel } from "@/lib/utils";
 import { TeamLogo } from "@/components/team-logo";
+import { UserAvatar } from "@/components/user-avatar";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -103,19 +104,20 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
               {top3.length > 0 && (
                 <div className="flex items-end justify-center gap-3 px-2 pt-4 pb-8">
                   {top3[1] && (
-                    <PodiumCard rank={2} name={top3[1].name || "Anonyme"} points={top3[1].wizzBalance} index={1} />
+                    <PodiumCard rank={2} name={top3[1].name || "Anonyme"} avatarUrl={top3[1].avatarUrl} points={top3[1].wizzBalance} index={1} />
                   )}
                   {top3[0] && (
                     <PodiumCard
                       rank={1}
                       name={top3[0].name || "Anonyme"}
+                      avatarUrl={top3[0].avatarUrl}
                       points={top3[0].wizzBalance}
                       index={0}
                       champion
                     />
                   )}
                   {top3[2] && (
-                    <PodiumCard rank={3} name={top3[2].name || "Anonyme"} points={top3[2].wizzBalance} index={2} />
+                    <PodiumCard rank={3} name={top3[2].name || "Anonyme"} avatarUrl={top3[2].avatarUrl} points={top3[2].wizzBalance} index={2} />
                   )}
                 </div>
               )}
@@ -142,6 +144,7 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
                        </span>
                        <Evolution value={user.evolution} />
                      </div>
+                    <UserAvatar src={user.avatarUrl} name={user.name} className="size-8 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className={cn("text-sm font-medium truncate", i === 0 && "font-bold")}>
                         {user.name || "Anonyme"}
@@ -244,7 +247,7 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
             <Card className="flex items-center justify-between p-3 hover:border-[var(--color-accent)]/30 transition-colors">
               <div>
                 <p className="text-sm font-semibold">Bracket double élimination</p>
-                <p className="text-[10px] text-[var(--color-muted)]">WB · LB · Finale BO3</p>
+                <p className="text-[10px] text-[var(--color-muted)]">Winners · Losers · Finale BO3</p>
               </div>
               <ChevronRight className="size-4 text-[var(--color-muted)]" />
             </Card>
@@ -304,12 +307,14 @@ function Evolution({ value }: { value: number | null }) {
 function PodiumCard({
   rank,
   name,
+  avatarUrl,
   points,
   index,
   champion = false,
 }: {
   rank: number;
   name: string;
+  avatarUrl: string | null;
   points: number;
   index: number;
   champion?: boolean;
@@ -331,16 +336,15 @@ function PodiumCard({
         </span>
       )}
 
-      <div
+      <UserAvatar
+        src={avatarUrl}
+        name={name}
         className={cn(
-          "flex items-center justify-center rounded-full border-2 font-[family-name:var(--font-display)] font-bold",
           champion
-            ? "h-16 w-16 border-[var(--color-gold)] bg-[var(--color-gold)]/10 text-2xl text-[var(--color-gold-bright)] shadow-[0_0_20px_var(--color-gold)]/30"
-            : "h-12 w-12 border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] text-lg text-[var(--color-cream)]"
+            ? "size-16 ring-2 ring-[var(--color-gold)]/60 shadow-[0_0_20px_var(--color-gold)]/30"
+            : "size-12 ring-2 ring-[var(--color-border-subtle)]"
         )}
-      >
-        {name[0]}
-      </div>
+      />
 
       <p
         className={cn(

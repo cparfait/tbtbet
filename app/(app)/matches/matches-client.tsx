@@ -55,8 +55,8 @@ interface Props {
 // ── Helpers de couleur par phase ───────────────────────────────────────────
 
 const BRACKET_PHASE: Record<string, { color: string; label: string }> = {
-  WINNER_BRACKET: { color: "#22c55e", label: "WB" },
-  LOSER_BRACKET:  { color: "#f97316", label: "LB" },
+  WINNER_BRACKET: { color: "#22c55e", label: "Winners" },
+  LOSER_BRACKET:  { color: "#f97316", label: "Losers" },
   FINAL_SERIES:   { color: "#eab308", label: "Finale" },
 };
 

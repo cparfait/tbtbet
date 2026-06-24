@@ -824,8 +824,8 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                       ? matchesGrouped.poolMap.get(m.teamA.poolId)
                       : null;
                     const phaseBadge =
-                      m.phase === "WINNER_BRACKET" ? { label: "WB", color: "#F5C400" } :
-                      m.phase === "LOSER_BRACKET"  ? { label: "LB", color: "#F97316" } :
+                      m.phase === "WINNER_BRACKET" ? { label: "Winners", color: "#F5C400" } :
+                      m.phase === "LOSER_BRACKET"  ? { label: "Losers", color: "#F97316" } :
                       m.phase === "FINAL_SERIES"   ? { label: "Finale", color: "#A78BFA" } :
                       null;
                     const isSelected = resultMatchId === m.id;

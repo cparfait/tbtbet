@@ -135,7 +135,7 @@ export default async function BracketPage() {
       {wbRounds.length > 0 && (
         <div>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--color-muted)]">
-            🏆 Winner Bracket
+            🏆 Winners Bracket
           </h2>
           <div className="overflow-x-auto">
             <div className="flex gap-4 pb-2" style={{ minWidth: `${wbRounds.length * 180}px` }}>
@@ -158,7 +158,7 @@ export default async function BracketPage() {
       {lbRounds.length > 0 && (
         <div>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--color-muted)]">
-            🔻 Loser Bracket
+            🔻 Losers Bracket
           </h2>
           <div className="overflow-x-auto">
             <div className="flex gap-4 pb-2" style={{ minWidth: `${lbRounds.length * 180}px` }}>
