@@ -20,7 +20,7 @@
 
 ## 🎯 C'est quoi ?
 
-**TBT Bet** est une appli web (PWA installable) de pronostics pour le **Tournoi de Babyfoot Withings** (10 équipes). Tu paries sur chaque match avec ta réserve de **Wizz**, joues tes **Jokers ×2**, et grimpes au classement des parieurs — le tout animé par un **chat global** pour la mauvaise foi d'usage.
+**TBT Bet** est une appli web (PWA installable) de pronostics pour le **Tournoi de Babyfoot ** (10 équipes). Tu paries sur chaque match avec ta réserve de **Wizz**, joues tes **Jokers ×2**, et grimpes au classement des parieurs — le tout animé par un **chat global** pour la mauvaise foi d'usage.
 
 Tout est saisi manuellement par l'admin (pas d'API externe).
 
