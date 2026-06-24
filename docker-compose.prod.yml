@@ -22,9 +22,14 @@ services:
       ODDS_API_KEY:   ""
       ODDS_API_SPORT: "soccer_fifa_world_cup"
       ODDS_API_REGION: "eu"
+    volumes:
+      - uploads:/app/public/uploads
     networks:
       - daronsfc_net   # réseau partagé avec daronsfc_db
       - proxy_net      # réseau de ton reverse proxy (NPM / Traefik)
+
+volumes:
+  uploads:
 
 networks:
   daronsfc_net:

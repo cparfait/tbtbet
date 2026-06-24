@@ -90,6 +90,8 @@ services:
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: "${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}"
       VAPID_PRIVATE_KEY: "${VAPID_PRIVATE_KEY:-}"
       NODE_ENV: production
+    volumes:
+      - uploads:/app/public/uploads
     networks:
       - tbtbet_net
 
@@ -100,3 +102,5 @@ networks:
 volumes:
   pgdata:
     name: tbtbet_pgdata
+  uploads:
+    name: tbtbet_uploads

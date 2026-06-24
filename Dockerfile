@@ -35,6 +35,11 @@ COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/lib/generated ./lib/generated
 
+# Dossier uploads : créé avec le bon owner pour que l'app puisse écrire
+# (le volume Docker sera monté ici en prod pour persister les fichiers)
+RUN mkdir -p /app/public/uploads/logos \
+ && chown -R nextjs:nodejs /app/public/uploads
+
 USER nextjs
 EXPOSE 3000
 
