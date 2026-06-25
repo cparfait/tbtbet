@@ -144,6 +144,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
   const [tiragePayload, setTiragePayload] = useState<TiragePayload | null>(null);
   const [tirageEventId, setTirageEventId] = useState<string | null>(null);
   const [tirageLoading, setTirageLoading] = useState(false);
+  const [nextRoundLoading, setNextRoundLoading] = useState(false);
 
   async function apiCall(url: string, method: string, body?: Record<string, unknown>) {
     const res = await fetch(url, {
@@ -372,6 +373,20 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: tirageEventId, step }),
     }).catch(() => {});
+  }
+
+  async function handleNextRound() {
+    setNextRoundLoading(true);
+    try {
+      const data = await apiCall("/api/admin/tirage/next-round", "POST") as {
+        wbCreated: number; lbCreated: number; grandFinal: boolean; byes: string[];
+      };
+      const msg = data.grandFinal
+        ? "Finale BO3 générée !"
+        : `Tour suivant généré : ${data.wbCreated} match(s) WB, ${data.lbCreated} match(s) LB.${data.byes.length ? ` (${data.byes.length} bye${data.byes.length > 1 ? "s" : ""})` : ""}`;
+      ok(msg);
+    } catch (e) { err(e); }
+    finally { setNextRoundLoading(false); }
   }
 
   function handleTirageClose() {
@@ -1376,6 +1391,37 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
               })}
             </Card>
           )}
+
+          {/* Générer le tour suivant */}
+          {bracketExists && (() => {
+            const pendingBracket = matches.some(
+              (m) => ["WINNER_BRACKET", "LOSER_BRACKET"].includes(m.phase) && ["SCHEDULED", "LIVE"].includes(m.status)
+            );
+            const finishedBracket = matches.some(
+              (m) => ["WINNER_BRACKET", "LOSER_BRACKET"].includes(m.phase) && m.status === "FINISHED"
+            );
+            const hasFinal = matches.some((m) => m.phase === "FINAL_SERIES");
+            if (!finishedBracket || hasFinal) return null;
+            return (
+              <Card className="p-4 space-y-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)] flex items-center gap-2">
+                  <Shuffle className="size-3.5" /> Tour suivant
+                </h4>
+                <p className="text-[11px] text-[var(--color-muted)] leading-relaxed">
+                  {pendingBracket
+                    ? "Des matchs sont encore en cours. Saisissez tous les résultats avant de générer le tour suivant."
+                    : "Tous les matchs du tour sont terminés. Le système va créer les matchs suivants automatiquement (bye si nombre impair)."}
+                </p>
+                <Button
+                  onClick={handleNextRound}
+                  disabled={pendingBracket || nextRoundLoading}
+                  className="w-full font-bold disabled:opacity-40"
+                >
+                  {nextRoundLoading ? "Génération…" : "⚡ Générer le tour suivant"}
+                </Button>
+              </Card>
+            );
+          })()}
         </div>
       )}
 
