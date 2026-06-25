@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getOddsForTeam, getOddsForDraw } from "@/lib/odds";
+import type { Prisma } from "@/lib/generated/prisma";
+import { getOddsForTeam, getOddsForDraw, DEFAULT_ELO } from "@/lib/odds";
 import { z } from "zod";
 
 const betSchema = z.object({
@@ -39,8 +40,8 @@ export async function POST(req: NextRequest) {
       prisma.match.findUnique({
         where: { id: matchId },
         include: {
-          teamA: { select: { wins: true } },
-          teamB: { select: { wins: true } },
+          teamA: { select: { wins: true, elo: true } },
+          teamB: { select: { wins: true, elo: true } },
         },
       }),
       prisma.user.findUnique({ where: { id: session.user.id } }),
@@ -60,19 +61,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "La date limite de pari est dépassée" }, { status: 400 });
     }
     if (amountWizz > user.wizzBalance) {
-      return NextResponse.json({ error: "Solde Wizz insuffisant" }, { status: 400 });
+      return NextResponse.json({ error: "Solde Wiz insuffisant" }, { status: 400 });
     }
-    if (jokerUsed && user.jokersLeft < 1) {
-      return NextResponse.json({ error: "Plus de jokers disponibles" }, { status: 400 });
+    if (jokerUsed) {
+      const currentBet = await prisma.bet.findUnique({
+        where: { userId_matchId: { userId: user.id, matchId } },
+        select: { jokerUsed: true },
+      });
+      if (user.jokersLeft < 1 && !currentBet?.jokerUsed) {
+        return NextResponse.json({ error: "Plus de Bonus ×2 disponibles" }, { status: 400 });
+      }
+      const isPoolPhase = match.phase === "POOL";
+      const matchPhaseFilter: Prisma.MatchWhereInput = isPoolPhase
+        ? { phase: "POOL" }
+        : { phase: { in: ["WINNER_BRACKET", "LOSER_BRACKET", "FINAL_SERIES"] } };
+      const phaseJokerBet = await prisma.bet.findFirst({
+        where: { userId: user.id, jokerUsed: true, matchId: { not: matchId }, match: matchPhaseFilter },
+      });
+      if (phaseJokerBet) {
+        return NextResponse.json(
+          { error: "Bonus ×2 déjà utilisé pour cette phase du tournoi" },
+          { status: 400 }
+        );
+      }
     }
 
     let oddsApplied: number;
     if (choice === "DRAW") {
       oddsApplied = getOddsForDraw();
     } else if (choice === "TEAM_A") {
-      oddsApplied = getOddsForTeam(match.phase, match.teamASource, match.teamBSource, match.teamA.wins);
+      oddsApplied = getOddsForTeam(match.teamA.elo, match.teamB?.elo ?? DEFAULT_ELO);
     } else {
-      oddsApplied = getOddsForTeam(match.phase, match.teamBSource, match.teamASource, match.teamB?.wins ?? 0);
+      oddsApplied = getOddsForTeam(match.teamB?.elo ?? DEFAULT_ELO, match.teamA.elo);
     }
 
     const existingBet = await prisma.bet.findUnique({

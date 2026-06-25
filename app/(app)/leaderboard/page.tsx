@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
-import { getLeaderboard, getAllPoolsStandings, getFinalSeries } from "@/lib/data/queries";
+import { getLeaderboard, getAllPoolsStandings, getFinalSeries, hasBracketMatches } from "@/lib/data/queries";
 import { LeaderboardClient } from "./leaderboard-client";
 
 export const metadata = { title: "Classement · TBT Bet" };
@@ -11,10 +11,11 @@ export default async function LeaderboardPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const [leaderboard, poolStandings, finalSeries] = await Promise.all([
+  const [leaderboard, poolStandings, finalSeries, bracketPhase] = await Promise.all([
     getLeaderboard(),
     getAllPoolsStandings(),
     getFinalSeries(),
+    hasBracketMatches(),
   ]);
 
   return (
@@ -25,6 +26,7 @@ export default async function LeaderboardPage() {
         poolStandings={poolStandings}
         finalSeries={finalSeries}
         currentUserId={session.user.id}
+        hasBracketPhase={bracketPhase}
       />
     </div>
   );

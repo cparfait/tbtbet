@@ -118,7 +118,7 @@ export async function getPoolMatchesByPoolId(poolId: string) {
 
 export async function getScheduledMatches() {
   return prisma.match.findMany({
-    where: { status: "SCHEDULED" },
+    where: { status: { in: ["SCHEDULED", "LIVE"] } },
     include: {
       teamA: true,
       teamB: true,
@@ -259,6 +259,7 @@ export async function getLeaderboard() {
       id: true,
       name: true,
       avatarUrl: true,
+      image: true,
       wizzBalance: true,
       jokersLeft: true,
       previousWizzRank: true,
@@ -277,7 +278,7 @@ export async function getLeaderboard() {
     return {
       id: u.id,
       name: u.name,
-      avatarUrl: u.avatarUrl,
+      avatarUrl: u.avatarUrl ?? u.image,
       wizzBalance: u.wizzBalance,
       jokersLeft: u.jokersLeft,
       evolution,
@@ -433,6 +434,13 @@ export async function getTournamentChampion() {
 // ─────────────────────────────────────────────
 // Admin
 // ─────────────────────────────────────────────
+
+export async function hasBracketMatches(): Promise<boolean> {
+  const count = await prisma.match.count({
+    where: { phase: { in: ["WINNER_BRACKET", "LOSER_BRACKET"] } },
+  });
+  return count > 0;
+}
 
 export async function getAdminStats() {
   const [users, matches, finishedMatches, messages, bets] = await Promise.all([

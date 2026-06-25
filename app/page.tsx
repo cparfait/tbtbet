@@ -12,13 +12,13 @@ export default async function LandingPage() {
       icon: "\u{1F3B2}",
       title: "Parie sur chaque match",
       description:
-        "Victoire A, Victoire B ou \u00c9galit\u00e9\u2014place tes Wizz et grimpe au classement.",
+        "Victoire A ou Victoire B\u2014place tes Wiz et grimpe au classement.",
     },
     {
       icon: "\u{1F0CF}",
-      title: "Joue ton Joker \u00D72 strat\u00e9gique",
+      title: "Joue ton Bonus \u00D72 strat\u00e9gique",
       description:
-        "Double tes gains : 2 jokers \u00e0 utiliser quand tu es s\u00fbr de toi.",
+        "Double tes gains : 1 Bonus \u00d72 en poules, 1 en \u00e9limination.",
     },
     {
       icon: "\u{1F3C6}",

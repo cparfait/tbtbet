@@ -2,7 +2,8 @@ import { redirect, notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
 import { getMatchById, getUserBetForMatch, getUserById, getPoolStandings, getPoolMatchesByPoolId, getScheduledMatches, getUserBets } from "@/lib/data/queries";
-import { getOddsForTeam, getOddsForDraw } from "@/lib/odds";
+import { getOddsForTeam, getOddsForDraw, DEFAULT_ELO } from "@/lib/odds";
+import { expectedScore } from "@/lib/elo";
 import { BetForm } from "./bet-form";
 import Link from "next/link";
 import { ArrowLeft, Lock, ChevronRight } from "lucide-react";
@@ -44,10 +45,13 @@ export default async function MatchDetailPage({
     ? await Promise.all([getPoolStandings(poolId), getPoolMatchesByPoolId(poolId)])
     : [null, []];
 
-  const oddsA = getOddsForTeam(match.phase, match.teamASource, match.teamBSource, match.teamA.wins);
-  const oddsB = getOddsForTeam(match.phase, match.teamBSource, match.teamASource, match.teamB?.wins ?? 0);
+  const oddsA = getOddsForTeam(match.teamA.elo, match.teamB?.elo ?? DEFAULT_ELO);
+  const oddsB = getOddsForTeam(match.teamB?.elo ?? DEFAULT_ELO, match.teamA.elo);
   const oddsDraw = getOddsForDraw();
-  const allowDraw = match.phase === "POOL";
+  const allowDraw = false;
+  const probARaw = expectedScore(match.teamA.elo, match.teamB?.elo ?? DEFAULT_ELO);
+  const probA = Math.round(probARaw * 100);
+  const probB = 100 - probA;
 
   const isFinished = match.status === "FINISHED";
   const isLive = match.status === "LIVE";
@@ -65,6 +69,17 @@ export default async function MatchDetailPage({
     const closesAt = m.bettingClosesAt ?? m.scheduledAt;
     return closesAt == null || new Date(closesAt) > new Date();
   }) ?? null;
+
+  // Per-phase joker: 1 Bonus ×2 usable per phase category
+  const isPoolPhase = match.phase === "POOL";
+  const phaseJokerUsed = userBets.some(
+    (b) => b.jokerUsed && b.matchId !== id && (b.match.phase === "POOL") === isPoolPhase
+  );
+  const jokersForThisPhase = phaseJokerUsed
+    ? 0
+    : existingBet?.jokerUsed
+    ? 1
+    : Math.min(1, user?.jokersLeft ?? 0);
 
   const betWon =
     existingBet?.settled &&
@@ -126,6 +141,14 @@ export default async function MatchDetailPage({
                 >
                   {match.teamA.name}
                 </p>
+                {(match.teamA.player1 || match.teamA.player2) && (
+                  <p className="text-[10px] text-[var(--color-muted)] mt-0.5 leading-tight">
+                    {match.teamA.player1 && match.teamA.player2
+                      ? `${match.teamA.player1} & ${match.teamA.player2}`
+                      : match.teamA.player1 ?? match.teamA.player2}
+                  </p>
+                )}
+                <p className="text-[9px] font-mono text-[var(--color-muted)]/60 mt-0.5">ELO {match.teamA.elo}</p>
               </div>
             </div>
 
@@ -180,6 +203,14 @@ export default async function MatchDetailPage({
                 >
                   {match.teamB?.name ?? "À déterminer"}
                 </p>
+                {match.teamB && (match.teamB.player1 || match.teamB.player2) && (
+                  <p className="text-[10px] text-[var(--color-muted)] mt-0.5 leading-tight">
+                    {match.teamB.player1 && match.teamB.player2
+                      ? `${match.teamB.player1} & ${match.teamB.player2}`
+                      : match.teamB.player1 ?? match.teamB.player2}
+                  </p>
+                )}
+                {match.teamB && <p className="text-[9px] font-mono text-[var(--color-muted)]/60 mt-0.5">ELO {match.teamB.elo}</p>}
               </div>
             </div>
           </div>
@@ -197,9 +228,11 @@ export default async function MatchDetailPage({
           oddsA={oddsA}
           oddsB={oddsB}
           oddsDraw={oddsDraw}
+          probA={probA}
+          probB={probB}
           allowDraw={allowDraw}
           userWizz={user?.wizzBalance ?? 0}
-          jokersLeft={user?.jokersLeft ?? 0}
+          jokersLeft={jokersForThisPhase}
           existingBet={
             existingBet
               ? {
@@ -239,12 +272,12 @@ export default async function MatchDetailPage({
                   : "Égalité"}
                 {existingBet.jokerUsed && (
                   <span className="ml-2 text-xs text-[var(--color-muted)]">
-                    🃏 Joker ×2
+                    🃏 Bonus ×2
                   </span>
                 )}
               </p>
               <p className="text-xs text-[var(--color-muted)] mt-0.5">
-                Mise : {existingBet.amountWizz} Wizz
+                Mise : {existingBet.amountWizz} Wiz
               </p>
             </div>
             {existingBet.settled && existingBet.payout != null && (
@@ -258,7 +291,7 @@ export default async function MatchDetailPage({
                     ? `+${existingBet.payout - existingBet.amountWizz}`
                     : `-${existingBet.amountWizz}`}
                 </p>
-                <p className="text-[10px] text-[var(--color-muted)]">Wizz</p>
+                <p className="text-[10px] text-[var(--color-muted)]">Wiz</p>
               </div>
             )}
           </div>
@@ -280,7 +313,7 @@ export default async function MatchDetailPage({
               >
                 <span className="font-medium">{bet.user.name || "Anonyme"}</span>
                 <div className="flex items-center gap-2 text-[var(--color-muted)]">
-                  <span className="text-xs">{bet.amountWizz} Wizz</span>
+                  <span className="text-xs">{bet.amountWizz} Wiz</span>
                   {bet.jokerUsed && <span className="text-xs">🃏</span>}
                 </div>
               </div>

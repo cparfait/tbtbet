@@ -64,9 +64,9 @@ export function WelcomeModal({ initialName }: { initialName: string }) {
           <div className="flex gap-3 items-start rounded-xl bg-[var(--color-surface-2)] p-3">
             <Zap className="size-5 text-[var(--color-accent)] mt-0.5 shrink-0" />
             <div>
-              <p className="text-sm font-semibold">100 Wizz de départ</p>
+              <p className="text-sm font-semibold">100 Wiz de départ</p>
               <p className="text-xs text-[var(--color-muted)]">
-                Ta monnaie pour parier. Tu commences avec 100 Wizz et 2 Jokers ×2.
+                Ta monnaie pour parier. Tu commences avec 100 Wiz et 1 Bonus ×2 par phase.
               </p>
             </div>
           </div>
@@ -97,7 +97,7 @@ export function WelcomeModal({ initialName }: { initialName: string }) {
             <div>
               <p className="text-sm font-semibold">Ton favori (gratuit)</p>
               <p className="text-xs text-[var(--color-muted)]">
-                Pronostique l&apos;équipe victorieuse du tournoi — sans mise Wizz,
+                Pronostique l&apos;équipe victorieuse du tournoi — sans mise Wiz,
                 juste pour la gloire !
               </p>
             </div>

@@ -19,6 +19,7 @@ const updateSchema = z.object({
   logoUrl: z.string().nullable().optional(),
   eliminated: z.boolean().optional(),
   losses: z.number().int().min(0).optional(),
+  elo: z.number().int().min(0).optional(),
 });
 
 export async function POST(req: NextRequest) {

@@ -20,7 +20,7 @@ export default async function AppLayout({
   const showWelcome = user && !user.hasSeenWelcome;
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col">
+    <div className="mx-auto flex min-h-dvh max-w-md md:max-w-2xl lg:max-w-4xl flex-col">
       <main className="page-enter flex-1 px-4 pb-24 pt-4">
         {children}
       </main>

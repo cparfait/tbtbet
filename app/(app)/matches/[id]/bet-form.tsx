@@ -22,6 +22,8 @@ interface BetFormProps {
   oddsA: number;
   oddsB: number;
   oddsDraw: number;
+  probA?: number;
+  probB?: number;
   allowDraw: boolean;
   userWizz: number;
   jokersLeft: number;
@@ -37,6 +39,8 @@ export function BetForm({
   oddsA,
   oddsB,
   oddsDraw,
+  probA,
+  probB,
   allowDraw,
   userWizz,
   jokersLeft,
@@ -56,8 +60,15 @@ export function BetForm({
   const potentialPayout = Math.round(amount * effectiveOdds);
   const potentialGain = potentialPayout - amount;
 
+  const isDirty = existingBet
+    ? choice !== existingBet.choice ||
+      amount !== existingBet.amountWizz ||
+      jokerUsed !== existingBet.jokerUsed
+    : true;
+
   async function handleSubmit() {
     if (amount < 1 || amount > userWizz) return;
+    if (existingBet && !isDirty) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -90,7 +101,7 @@ export function BetForm({
         </p>
         <p className="flex items-center gap-1 text-[10px] text-[var(--color-muted)]">
           <Zap className="size-3 text-[var(--color-accent)]" />
-          {userWizz} Wizz
+          {userWizz} Wiz
         </p>
       </div>
 
@@ -124,6 +135,12 @@ export function BetForm({
                 <p className={cn("text-xs font-black mt-0.5", active ? "text-[var(--color-accent)]" : "text-[var(--color-muted)]")}>
                   ×{oddsMap[c]}
                 </p>
+                {c === "TEAM_A" && probA != null && (
+                  <p className="text-[9px] text-[var(--color-muted)] mt-0.5">{probA}%</p>
+                )}
+                {c === "TEAM_B" && probB != null && (
+                  <p className="text-[9px] text-[var(--color-muted)] mt-0.5">{probB}%</p>
+                )}
               </div>
             </button>
           );
@@ -135,7 +152,7 @@ export function BetForm({
         <div className="flex items-center justify-between mb-1.5">
           <label className="text-[10px] text-[var(--color-muted)]">Mise</label>
           <span className="flex items-center gap-0.5 text-sm font-black text-[var(--color-cream)]">
-            <Zap className="size-3.5 text-[var(--color-accent)]" />{amount} Wizz
+            <Zap className="size-3.5 text-[var(--color-accent)]" />{amount} Wiz
           </span>
         </div>
         <input
@@ -152,7 +169,7 @@ export function BetForm({
         </div>
       </div>
 
-      {/* Joker */}
+      {/* Bonus ×2 (ex-Joker) */}
       {jokersLeft > 0 && (
         <button
           onClick={() => setJokerUsed(!jokerUsed)}
@@ -167,7 +184,7 @@ export function BetForm({
             <span className="text-sm">🃏</span>
             <div className="text-left">
               <p className={cn("text-xs font-semibold", jokerUsed ? "text-[var(--color-accent)]" : "")}>
-                Joker ×2
+                Bonus ×2
               </p>
               <p className="text-[9px] text-[var(--color-muted)]">
                 {jokersLeft} restant{jokersLeft > 1 ? "s" : ""}
@@ -185,7 +202,7 @@ export function BetForm({
         <div>
           <p className="text-[9px] text-[var(--color-muted)]">Gain potentiel</p>
           <p className="flex items-center gap-0.5 text-lg font-black text-[var(--color-accent)]">
-            <Zap className="size-4" />+{potentialGain} Wizz
+            <Zap className="size-4" />+{potentialGain} Wiz
           </p>
         </div>
         <div className="text-right">
@@ -200,15 +217,17 @@ export function BetForm({
 
       <button
         onClick={handleSubmit}
-        disabled={submitting || success || amount < 1 || amount > userWizz}
+        disabled={submitting || success || amount < 1 || amount > userWizz || (!!existingBet && !isDirty)}
         className={cn(
           "w-full rounded-2xl py-3 text-sm font-black transition-all",
           success
             ? "bg-green-500 text-white"
-            : "bg-[var(--color-accent)] text-black hover:brightness-110 disabled:opacity-40"
+            : existingBet && !isDirty
+              ? "bg-[var(--color-surface-2)] text-[var(--color-muted)] cursor-not-allowed"
+              : "bg-[var(--color-accent)] text-black hover:brightness-110 disabled:opacity-40"
         )}
       >
-        {success ? "✓ Pari enregistré !" : submitting ? "Envoi…" : existingBet ? "Modifier le pari" : `Parier ${amount} Wizz`}
+        {success ? "✓ Pari enregistré !" : submitting ? "Envoi…" : existingBet ? "Modifier le pari" : `Parier ${amount} Wiz`}
       </button>
     </div>
   );

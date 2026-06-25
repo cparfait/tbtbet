@@ -59,6 +59,7 @@ model Team {
   eliminated Boolean  @default(false)
   losses     Int      @default(0)
   wins       Int      @default(0)
+  elo        Int      @default(1000)
 
   matchesAsTeamA Match[]       @relation("TeamA")
   matchesAsTeamB Match[]       @relation("TeamB")
@@ -119,6 +120,8 @@ model Match {
   result          MatchResult?
   scoreA          Int?
   scoreB          Int?
+  eloChangeA      Int?          // delta ELO appliqué à teamA lors du résultat
+  eloChangeB      Int?          // delta ELO appliqué à teamB lors du résultat
   finalSeriesId   String?       // null sauf si ce match fait partie du BO3 final
   finalSeries     FinalSeries?  @relation(fields: [finalSeriesId], references: [id])
   createdAt       DateTime      @default(now())

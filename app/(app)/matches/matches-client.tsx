@@ -7,7 +7,7 @@ import { ChevronRight, ChevronDown, CalendarDays, CheckCircle2 } from "lucide-re
 import Link from "next/link";
 import { cn, dayKey, dayLabel, formatKickoffTime, formatMatchLabel } from "@/lib/utils";
 import { TeamLogo } from "@/components/team-logo";
-import { getOddsForTeam, getOddsForDraw } from "@/lib/odds";
+import { getOddsForTeam, getOddsForDraw, DEFAULT_ELO } from "@/lib/odds";
 import type { MatchPhase, BracketSource } from "@/lib/generated/prisma";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -16,6 +16,7 @@ interface MatchTeam {
   name: string;
   logoUrl: string | null;
   wins: number;
+  elo: number;
   pool?: { id: string; name: string; color: string } | null;
 }
 
@@ -158,17 +159,17 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
 
   // ── Carte match à venir ───────────────────────────────────────────────────
   function UpcomingCard({ match }: { match: MatchForList }) {
-    const oddsA = getOddsForTeam(match.phase, match.teamASource, match.teamBSource, match.teamA.wins);
-    const oddsB = getOddsForTeam(match.phase, match.teamBSource, match.teamASource, match.teamB?.wins ?? 0);
+    const oddsA = getOddsForTeam(match.teamA.elo, match.teamB?.elo ?? DEFAULT_ELO);
+    const oddsB = getOddsForTeam(match.teamB?.elo ?? DEFAULT_ELO, match.teamA.elo);
     const oddsDraw = getOddsForDraw();
-    const allowDraw = match.phase === "POOL";
+    const allowDraw = false;
     const bet = betMap[match.id];
     const betChoice = bet?.choice === "TEAM_A" ? match.teamA.name
       : bet?.choice === "TEAM_B" ? (match.teamB?.name ?? "?")
       : bet?.choice === "DRAW" ? "Égalité" : null;
     const closesAt = match.bettingClosesAt ?? match.scheduledAt;
     const isClosed = closesAt != null && new Date(closesAt) <= new Date();
-    const canBet = !isClosed;
+    const canBet = !isClosed && match.status !== "LIVE";
     const isExpanded = expandedId === match.id;
     const phaseStyle = getPhaseStyle(match.phase, match.teamA.pool);
 
@@ -421,7 +422,7 @@ export function MatchesClient({ upcoming, finished, betMap, userWizz, jokersLeft
                   </span>
                   <div className="h-px flex-1 bg-gradient-to-r from-[var(--color-border-subtle)] to-transparent" />
                 </div>
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {filtered.map((match) => <FinishedCard key={match.id} match={match} />)}
                 </div>
               </div>

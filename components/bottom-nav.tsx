@@ -2,63 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
-import {
-  Home,
-  Trophy,
-  MessageCircle,
-  ShieldCheck,
-} from "lucide-react";
+import { Home, Trophy, User, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BASE_ITEMS = [
-  { href: "/dashboard", label: "Accueil", icon: Home },
   { href: "/leaderboard", label: "Classement", icon: Trophy },
-  { href: "/chat", label: "Chat", icon: MessageCircle },
+  { href: "/dashboard", label: "Accueil", icon: Home },
+  { href: "/profile", label: "Profil", icon: User },
 ] as const;
 
 const ADMIN_ITEM = { href: "/admin", label: "Admin", icon: ShieldCheck } as const;
 
-/** Détecte les nouveaux messages du tchat (pastille). */
-function useChatUnread(pathname: string): boolean {
-  const [unread, setUnread] = useState(false);
-  const onChat = pathname.startsWith("/chat");
-
-  const check = useCallback(async () => {
-    const key = "tbtbet-chat-lastseen";
-    let since = localStorage.getItem(key);
-    if (!since) {
-      since = new Date().toISOString();
-      localStorage.setItem(key, since);
-    }
-    try {
-      const res = await fetch(`/api/messages?since=${encodeURIComponent(since)}`);
-      if (!res.ok) return;
-      const msgs: { timestamp: string }[] = await res.json();
-      setUnread(msgs.length > 0);
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    if (onChat) {
-      const mark = () =>
-        localStorage.setItem("tbtbet-chat-lastseen", new Date().toISOString());
-      mark();
-      setUnread(false);
-      const t = setInterval(mark, 5_000);
-      return () => clearInterval(t);
-    }
-    check();
-    const t = setInterval(check, 20_000);
-    return () => clearInterval(t);
-  }, [onChat, check]);
-
-  return unread && !onChat;
-}
-
 export function BottomNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
-  const chatUnread = useChatUnread(pathname);
   const items = isAdmin ? [...BASE_ITEMS, ADMIN_ITEM] : BASE_ITEMS;
 
   return (
@@ -98,9 +54,6 @@ export function BottomNav({ isAdmin = false }: { isAdmin?: boolean }) {
                     )}
                     strokeWidth={active ? 2.5 : 1.8}
                   />
-                  {href === "/chat" && chatUnread && (
-                    <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-red-500 ring-2 ring-[var(--color-bg)]" />
-                  )}
                 </span>
                 <span
                   className={cn(

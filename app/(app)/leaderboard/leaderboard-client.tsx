@@ -53,11 +53,12 @@ interface Props {
   poolStandings: PoolStandings[];
   finalSeries: FinalSeries | null;
   currentUserId: string;
+  hasBracketPhase?: boolean;
 }
 
 // ── Composant principal ────────────────────────────────────────────────────────
 
-export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, currentUserId }: Props) {
+export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, currentUserId, hasBracketPhase = false }: Props) {
   const [tab, setTab] = useState<"players" | "teams">("players");
 
   const top3 = leaderboard.slice(0, 3);
@@ -123,7 +124,7 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
               )}
 
               {/* ── Classement complet ── */}
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {leaderboard.map((user, i) => (
                 <Link
                   key={user.id}
@@ -159,7 +160,7 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
                       "shrink-0 text-sm font-bold tabular-nums",
                       i === 0 ? "text-[var(--color-gold-bright)]" : "text-[var(--color-accent)]"
                     )}>
-                      {user.wizzBalance} Wizz
+                      {user.wizzBalance} Wiz
                     </p>
                   </Card>
                 </Link>
@@ -174,13 +175,27 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
       {tab === "teams" && (
         <div className="space-y-4">
 
+          {/* Bracket en premier si phase bracket active */}
+          {hasBracketPhase && (
+            <Link href="/leaderboard/bracket">
+              <Card className="flex items-center justify-between p-3 border-[var(--color-accent)]/20 hover:border-[var(--color-accent)]/40 transition-colors">
+                <div>
+                  <p className="text-sm font-semibold">Bracket double élimination</p>
+                  <p className="text-[10px] text-[var(--color-muted)]">Winners · Losers · Finale BO3</p>
+                </div>
+                <ChevronRight className="size-4 text-[var(--color-muted)]" />
+              </Card>
+            </Link>
+          )}
+
           {/* Classements de poules */}
           {poolStandings.length === 0 ? (
             <Card className="p-4 text-center text-sm text-[var(--color-muted)]">
               Aucune poule configurée.
             </Card>
           ) : (
-            poolStandings.map((pool) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {poolStandings.map((pool) => (
               <div key={pool.id}>
                 {/* Header de poule coloré */}
                 <div
@@ -242,19 +257,22 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
                   </Card>
                 )}
               </div>
-            ))
+            ))}
+            </div>
           )}
 
-          {/* Bracket */}
-          <Link href="/leaderboard/bracket">
-            <Card className="flex items-center justify-between p-3 hover:border-[var(--color-accent)]/30 transition-colors">
-              <div>
-                <p className="text-sm font-semibold">Bracket double élimination</p>
-                <p className="text-[10px] text-[var(--color-muted)]">Winners · Losers · Finale BO3</p>
-              </div>
-              <ChevronRight className="size-4 text-[var(--color-muted)]" />
-            </Card>
-          </Link>
+          {/* Bracket en bas si pas encore en phase bracket */}
+          {!hasBracketPhase && (
+            <Link href="/leaderboard/bracket">
+              <Card className="flex items-center justify-between p-3 hover:border-[var(--color-accent)]/30 transition-colors">
+                <div>
+                  <p className="text-sm font-semibold">Bracket double élimination</p>
+                  <p className="text-[10px] text-[var(--color-muted)]">Winners · Losers · Finale BO3</p>
+                </div>
+                <ChevronRight className="size-4 text-[var(--color-muted)]" />
+              </Card>
+            </Link>
+          )}
 
           {/* Finale BO3 */}
           {finalSeries && (
@@ -365,7 +383,7 @@ function PodiumCard({
             : "text-base text-[var(--color-gold)]"
         )}
       >
-        {points} Wizz
+        {points} Wiz
       </p>
 
       <div

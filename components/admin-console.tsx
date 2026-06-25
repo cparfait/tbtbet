@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn, dayKey, dayLabel, formatKickoffTime } from "@/lib/utils";
 import { TeamLogo } from "@/components/team-logo";
-import { Users, Swords, Trophy, Plus, Trash2, CheckCircle2, Calendar, RefreshCw, ImageIcon, Upload, Wrench, RotateCcw, Sparkles } from "lucide-react";
+import { Users, Swords, Trophy, Plus, Trash2, CheckCircle2, Calendar, RefreshCw, ImageIcon, Upload, Wrench, RotateCcw, Sparkles, Zap, TrendingUp } from "lucide-react";
 
 // ── Types ──
 
@@ -30,6 +30,7 @@ interface Team {
   poolId: string | null;
   pool?: { id: string; name: string } | null;
   eliminated: boolean;
+  elo: number;
 }
 
 interface Pool {
@@ -53,6 +54,8 @@ interface Match {
   scoreB: number | null;
   scheduledAt: Date | string | null;
   finalSeriesId: string | null;
+  eloChangeA: number | null;
+  eloChangeB: number | null;
 }
 
 interface AdminConsoleProps {
@@ -63,7 +66,7 @@ interface AdminConsoleProps {
   currentUserId: string;
 }
 
-type Tab = "teams" | "pools" | "matches" | "results" | "users" | "tools";
+type Tab = "teams" | "pools" | "matches" | "results" | "users" | "tools" | "elo";
 
 const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
   { key: "teams", label: "Équipes", icon: Swords },
@@ -71,6 +74,7 @@ const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
   { key: "matches", label: "Matchs", icon: Calendar },
   { key: "results", label: "Résultats", icon: CheckCircle2 },
   { key: "users", label: "Joueurs", icon: Users },
+  { key: "elo", label: "ELO", icon: TrendingUp },
   { key: "tools", label: "Outils", icon: Wrench },
 ];
 
@@ -130,6 +134,9 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserPassword, setNewUserPassword] = useState("");
   const [newUserRole, setNewUserRole] = useState<"USER" | "ADMIN">("USER");
+
+  // ELO inline editing (teamId → value as string)
+  const [eloEdits, setEloEdits] = useState<Record<string, string>>({});
 
   async function apiCall(url: string, method: string, body?: Record<string, unknown>) {
     const res = await fetch(url, {
@@ -312,10 +319,47 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
     catch (e) { err(e); }
   }
 
+  // ── Live toggle ──
+  async function handleToggleLive(matchId: string, currentStatus: string) {
+    const newStatus = currentStatus === "LIVE" ? "SCHEDULED" : "LIVE";
+    try {
+      await apiCall("/api/admin/matches", "PATCH", { id: matchId, status: newStatus });
+      ok(newStatus === "LIVE" ? "Match passé en LIVE. Paris bloqués." : "Match repassé en SCHEDULED.");
+    } catch (e) { err(e); }
+  }
+
+  // ── ELO inline save ──
+  async function handleSaveElo(teamId: string) {
+    const raw = eloEdits[teamId];
+    if (raw === undefined) return;
+    const newElo = parseInt(raw, 10);
+    if (isNaN(newElo) || newElo < 0) return;
+    const team = teams.find((t) => t.id === teamId);
+    if (team && newElo === team.elo) {
+      setEloEdits((prev) => { const n = { ...prev }; delete n[teamId]; return n; });
+      return;
+    }
+    try {
+      await apiCall("/api/admin/teams", "PATCH", { id: teamId, elo: newElo });
+      setEloEdits((prev) => { const n = { ...prev }; delete n[teamId]; return n; });
+      ok("ELO mis à jour.");
+    } catch (e) { err(e); }
+  }
+
   // ── Tools ──
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDemo, setConfirmDemo] = useState(false);
-  const [toolLoading, setToolLoading] = useState<"reset" | "demo" | null>(null);
+  const [toolLoading, setToolLoading] = useState<"reset" | "demo" | "giveWiz" | null>(null);
+  const [giveWizAmount, setGiveWizAmount] = useState(10);
+
+  async function handleGiveWiz() {
+    setToolLoading("giveWiz");
+    try {
+      const data = await apiCall("/api/admin/give-wiz", "POST", { amount: giveWizAmount });
+      ok(`+${giveWizAmount} Wiz distribués à ${data.usersUpdated} joueurs.`);
+    } catch (e) { err(e); }
+    finally { setToolLoading(null); }
+  }
 
   async function handleReset() {
     setToolLoading("reset");
@@ -552,7 +596,20 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
 
                     {/* Info + pool */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{team.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{team.name}</p>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="text-[10px] font-mono text-[var(--color-muted)]">ELO</span>
+                          <input
+                            type="number"
+                            value={eloEdits[team.id] ?? team.elo}
+                            onChange={(e) => setEloEdits((prev) => ({ ...prev, [team.id]: e.target.value }))}
+                            onBlur={() => handleSaveElo(team.id)}
+                            onKeyDown={(e) => { if (e.key === "Enter") handleSaveElo(team.id); }}
+                            className="w-16 rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-1 py-0.5 text-[10px] font-mono text-[var(--color-accent)] text-center outline-none focus:border-[var(--color-accent)]/60"
+                          />
+                        </div>
+                      </div>
                       <p className="text-[10px] text-[var(--color-muted)]">
                         {[team.player1, team.player2].filter(Boolean).join(" & ") || "—"}
                       </p>
@@ -830,54 +887,76 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                       null;
                     const isSelected = resultMatchId === m.id;
                     const isDone = m.status === "FINISHED";
+                    const isLive = m.status === "LIVE";
                     return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          const selecting = !isSelected;
-                          setResultMatchId(selecting ? m.id : "");
-                          if (selecting) {
-                            setResultScoreA(m.scoreA ?? 0);
-                            setResultScoreB(m.scoreB ?? 0);
-                            if (m.result) setResultWinner(m.result as "TEAM_A" | "TEAM_B" | "DRAW");
-                            else if (m.phase !== "POOL") setResultWinner("TEAM_A");
-                          }
-                        }}
-                        className={cn(
-                          "w-full text-left rounded-md px-2 py-1.5 text-xs transition-colors flex items-center gap-1.5",
-                          isSelected
-                            ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
-                            : isDone
-                            ? "text-[var(--color-muted)] hover:bg-[var(--color-surface-1)]"
-                            : "text-[var(--color-cream)] hover:bg-[var(--color-surface-1)]"
-                        )}
-                      >
-                        {pool && (
-                          <span
-                            className="shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold"
-                            style={{ background: pool.color + "30", color: pool.color }}
+                      <div key={m.id} className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const selecting = !isSelected;
+                            setResultMatchId(selecting ? m.id : "");
+                            if (selecting) {
+                              setResultScoreA(m.scoreA ?? 0);
+                              setResultScoreB(m.scoreB ?? 0);
+                              if (m.result) setResultWinner(m.result as "TEAM_A" | "TEAM_B" | "DRAW");
+                              else if (m.phase !== "POOL") setResultWinner("TEAM_A");
+                            }
+                          }}
+                          className={cn(
+                            "flex-1 text-left rounded-md px-2 py-1.5 text-xs transition-colors flex items-center gap-1.5",
+                            isSelected
+                              ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
+                              : isDone
+                              ? "text-[var(--color-muted)] hover:bg-[var(--color-surface-1)]"
+                              : "text-[var(--color-cream)] hover:bg-[var(--color-surface-1)]"
+                          )}
+                        >
+                          {pool && (
+                            <span
+                              className="shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold"
+                              style={{ background: pool.color + "30", color: pool.color }}
+                            >
+                              {pool.name}
+                            </span>
+                          )}
+                          {phaseBadge && (
+                            <span
+                              className="shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold"
+                              style={{ background: phaseBadge.color + "30", color: phaseBadge.color }}
+                            >
+                              {phaseBadge.label}
+                            </span>
+                          )}
+                          {isLive && (
+                            <span className="shrink-0 flex items-center gap-0.5 text-[8px] font-bold text-red-400">
+                              <span className="size-1.5 rounded-full bg-red-500 animate-pulse" />LIVE
+                            </span>
+                          )}
+                          <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB?.name ?? "À déterminer"}</span>
+                          {isDone ? (
+                            <span className="shrink-0 text-[10px] text-green-400 font-bold">✓ {m.scoreA}-{m.scoreB}</span>
+                          ) : (
+                            <span className="shrink-0 text-[9px] text-[var(--color-muted)]">
+                              {formatKickoffTime(m.scheduledAt!)}
+                            </span>
+                          )}
+                        </button>
+                        {!isDone && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleLive(m.id, m.status)}
+                            title={isLive ? "Désactiver LIVE" : "Passer en LIVE"}
+                            className={cn(
+                              "shrink-0 rounded-md px-1.5 text-[9px] font-bold transition-colors",
+                              isLive
+                                ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                                : "bg-[var(--color-surface-1)] text-[var(--color-muted)] hover:text-red-400"
+                            )}
                           >
-                            {pool.name}
-                          </span>
+                            {isLive ? "⏸" : "🔴"}
+                          </button>
                         )}
-                        {phaseBadge && (
-                          <span
-                            className="shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold"
-                            style={{ background: phaseBadge.color + "30", color: phaseBadge.color }}
-                          >
-                            {phaseBadge.label}
-                          </span>
-                        )}
-                        <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB?.name ?? "À déterminer"}</span>
-                        {isDone ? (
-                          <span className="shrink-0 text-[10px] text-green-400 font-bold">✓ {m.scoreA}-{m.scoreB}</span>
-                        ) : (
-                          <span className="shrink-0 text-[9px] text-[var(--color-muted)]">
-                            {formatKickoffTime(m.scheduledAt!)}
-                          </span>
-                        )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -897,33 +976,55 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                     {poolMatches.map((m) => {
                       const isSelected = resultMatchId === m.id;
                       const isDone = m.status === "FINISHED";
+                      const isLive = m.status === "LIVE";
                       return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => {
-                            const selecting = !isSelected;
-                            setResultMatchId(selecting ? m.id : "");
-                            if (selecting) {
-                              setResultScoreA(m.scoreA ?? 0);
-                              setResultScoreB(m.scoreB ?? 0);
-                              if (m.result) setResultWinner(m.result as "TEAM_A" | "TEAM_B" | "DRAW");
-                            }
-                          }}
-                          className={cn(
-                            "w-full text-left rounded-md px-2 py-1.5 text-xs transition-colors flex items-center gap-1.5",
-                            isSelected
-                              ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
-                              : isDone
-                              ? "text-[var(--color-muted)] hover:bg-[var(--color-surface-1)]"
-                              : "text-[var(--color-cream)] hover:bg-[var(--color-surface-1)]"
+                        <div key={m.id} className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const selecting = !isSelected;
+                              setResultMatchId(selecting ? m.id : "");
+                              if (selecting) {
+                                setResultScoreA(m.scoreA ?? 0);
+                                setResultScoreB(m.scoreB ?? 0);
+                                if (m.result) setResultWinner(m.result as "TEAM_A" | "TEAM_B" | "DRAW");
+                              }
+                            }}
+                            className={cn(
+                              "flex-1 text-left rounded-md px-2 py-1.5 text-xs transition-colors flex items-center gap-1.5",
+                              isSelected
+                                ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
+                                : isDone
+                                ? "text-[var(--color-muted)] hover:bg-[var(--color-surface-1)]"
+                                : "text-[var(--color-cream)] hover:bg-[var(--color-surface-1)]"
+                            )}
+                          >
+                            {isLive && (
+                              <span className="shrink-0 flex items-center gap-0.5 text-[8px] font-bold text-red-400">
+                                <span className="size-1.5 rounded-full bg-red-500 animate-pulse" />LIVE
+                              </span>
+                            )}
+                            <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB?.name ?? "À déterminer"}</span>
+                            {isDone && (
+                              <span className="shrink-0 text-[10px] text-green-400 font-bold">✓ {m.scoreA}-{m.scoreB}</span>
+                            )}
+                          </button>
+                          {!isDone && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleLive(m.id, m.status)}
+                              title={isLive ? "Désactiver LIVE" : "Passer en LIVE"}
+                              className={cn(
+                                "shrink-0 rounded-md px-1.5 text-[9px] font-bold transition-colors",
+                                isLive
+                                  ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                                  : "bg-[var(--color-surface-1)] text-[var(--color-muted)] hover:text-red-400"
+                              )}
+                            >
+                              {isLive ? "⏸" : "🔴"}
+                            </button>
                           )}
-                        >
-                          <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB?.name ?? "À déterminer"}</span>
-                          {isDone && (
-                            <span className="shrink-0 text-[10px] text-green-400 font-bold">✓ {m.scoreA}-{m.scoreB}</span>
-                          )}
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -939,36 +1040,58 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                   {matchesGrouped.bracket.map((m) => {
                     const isSelected = resultMatchId === m.id;
                     const isDone = m.status === "FINISHED";
+                    const isLive = m.status === "LIVE";
                     return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          const selecting = !isSelected;
-                          setResultMatchId(selecting ? m.id : "");
-                          if (selecting) {
-                            setResultScoreA(m.scoreA ?? 0);
-                            setResultScoreB(m.scoreB ?? 0);
-                            if (m.result) setResultWinner(m.result as "TEAM_A" | "TEAM_B" | "DRAW");
-                            else setResultWinner("TEAM_A");
-                          }
-                        }}
-                        className={cn(
-                          "w-full text-left rounded-md px-2 py-1.5 text-xs transition-colors flex items-center gap-1.5",
-                          isSelected
-                            ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
-                            : isDone
-                            ? "text-[var(--color-muted)] hover:bg-[var(--color-surface-1)]"
-                            : "text-[var(--color-cream)] hover:bg-[var(--color-surface-1)]"
+                      <div key={m.id} className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const selecting = !isSelected;
+                            setResultMatchId(selecting ? m.id : "");
+                            if (selecting) {
+                              setResultScoreA(m.scoreA ?? 0);
+                              setResultScoreB(m.scoreB ?? 0);
+                              if (m.result) setResultWinner(m.result as "TEAM_A" | "TEAM_B" | "DRAW");
+                              else setResultWinner("TEAM_A");
+                            }
+                          }}
+                          className={cn(
+                            "flex-1 text-left rounded-md px-2 py-1.5 text-xs transition-colors flex items-center gap-1.5",
+                            isSelected
+                              ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
+                              : isDone
+                              ? "text-[var(--color-muted)] hover:bg-[var(--color-surface-1)]"
+                              : "text-[var(--color-cream)] hover:bg-[var(--color-surface-1)]"
+                          )}
+                        >
+                          {isLive && (
+                            <span className="shrink-0 flex items-center gap-0.5 text-[8px] font-bold text-red-400">
+                              <span className="size-1.5 rounded-full bg-red-500 animate-pulse" />LIVE
+                            </span>
+                          )}
+                          <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB?.name ?? "À déterminer"}</span>
+                          {isDone ? (
+                            <span className="shrink-0 text-[10px] text-green-400 font-bold">✓ {m.scoreA}-{m.scoreB}</span>
+                          ) : m.label && !m.label.includes(" vs ") ? (
+                            <span className="shrink-0 text-[9px] text-[var(--color-muted)]">{m.label}</span>
+                          ) : null}
+                        </button>
+                        {!isDone && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleLive(m.id, m.status)}
+                            title={isLive ? "Désactiver LIVE" : "Passer en LIVE"}
+                            className={cn(
+                              "shrink-0 rounded-md px-1.5 text-[9px] font-bold transition-colors",
+                              isLive
+                                ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                                : "bg-[var(--color-surface-1)] text-[var(--color-muted)] hover:text-red-400"
+                            )}
+                          >
+                            {isLive ? "⏸" : "🔴"}
+                          </button>
                         )}
-                      >
-                        <span className="flex-1 font-medium truncate">{m.teamA.name} vs {m.teamB?.name ?? "À déterminer"}</span>
-                        {isDone ? (
-                          <span className="shrink-0 text-[10px] text-green-400 font-bold">✓ {m.scoreA}-{m.scoreB}</span>
-                        ) : m.label && !m.label.includes(" vs ") ? (
-                          <span className="shrink-0 text-[9px] text-[var(--color-muted)]">{m.label}</span>
-                        ) : null}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -1101,6 +1224,88 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
         </div>
       )}
 
+      {/* ── ELO ── */}
+      {tab === "elo" && (() => {
+        const teamsByElo = [...teams].sort((a, b) => b.elo - a.elo);
+        const eloMatches = matches
+          .filter((m) => m.status === "FINISHED" && (m.eloChangeA !== null || m.eloChangeB !== null))
+          .sort((a, b) => {
+            if (!a.scheduledAt && !b.scheduledAt) return 0;
+            if (!a.scheduledAt) return 1;
+            if (!b.scheduledAt) return -1;
+            return new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime();
+          });
+
+        function eloTag(delta: number | null) {
+          if (delta === null) return null;
+          const sign = delta > 0 ? "+" : "";
+          return (
+            <span className={`text-[9px] font-bold font-mono ${delta > 0 ? "text-green-400" : delta < 0 ? "text-red-400" : "text-[var(--color-muted)]"}`}>
+              {sign}{delta}
+            </span>
+          );
+        }
+
+        return (
+          <div className="space-y-4">
+            {/* Classement ELO actuel */}
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)] mb-2">
+                Classement ELO actuel
+              </h3>
+              <Card className="overflow-hidden divide-y divide-[var(--color-border-subtle)]">
+                {teamsByElo.map((team, i) => (
+                  <div key={team.id} className="flex items-center gap-3 px-3 py-2">
+                    <span className="w-5 shrink-0 text-[10px] text-[var(--color-muted)] text-center font-mono">{i + 1}</span>
+                    <div className="size-6 shrink-0 rounded overflow-hidden">
+                      {team.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={team.logoUrl} alt={team.name} className="size-full object-contain" />
+                      ) : (
+                        <div className="size-full bg-[var(--color-surface-2)]" />
+                      )}
+                    </div>
+                    <span className="flex-1 text-xs font-medium truncate">{team.name}</span>
+                    <span className="shrink-0 text-xs font-black font-mono text-[var(--color-accent)]">{team.elo}</span>
+                  </div>
+                ))}
+              </Card>
+            </div>
+
+            {/* Historique des deltas ELO */}
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)] mb-2">
+                Historique ELO par match
+              </h3>
+              {eloMatches.length === 0 ? (
+                <Card className="p-4 text-center text-xs text-[var(--color-muted)]">
+                  Aucun match terminé avec deltas ELO.
+                </Card>
+              ) : (
+                <div className="space-y-1">
+                  {eloMatches.map((m) => (
+                    <Card key={m.id} className="p-2.5">
+                      <p className="text-[9px] text-[var(--color-muted)] mb-1.5">
+                        {m.label}{m.scheduledAt ? ` · ${formatDate(m.scheduledAt)}` : ""}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="flex-1 truncate font-medium">{m.teamA.name}</span>
+                        {eloTag(m.eloChangeA)}
+                        <span className="shrink-0 font-black tabular-nums text-[var(--color-muted)]">
+                          {m.scoreA} – {m.scoreB}
+                        </span>
+                        {eloTag(m.eloChangeB)}
+                        <span className="flex-1 truncate font-medium text-right">{m.teamB?.name ?? "?"}</span>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {tab === "tools" && (
         <div className="space-y-4">
           {/* Reset */}
@@ -1111,7 +1316,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                 <h3 className="text-sm font-semibold text-red-400">Réinitialiser les données</h3>
                 <p className="text-xs text-[var(--color-muted)] mt-0.5">
                   Supprime toutes les équipes, poules, matchs, paris et joueurs.
-                  Le compte admin est conservé (solde remis à 100 Wizz).
+                  Le compte admin est conservé (solde remis à 100 Wiz).
                 </p>
               </div>
             </div>
@@ -1142,6 +1347,41 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                 </div>
               </div>
             )}
+          </Card>
+
+          {/* Give Wiz */}
+          <Card className="p-4 space-y-3 border border-[var(--color-accent)]/20">
+            <div className="flex items-start gap-3">
+              <Zap className="size-5 text-[var(--color-accent)] shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--color-accent)]">Donner des Wiz à tous</h3>
+                <p className="text-xs text-[var(--color-muted)] mt-0.5">
+                  Crédite tous les joueurs non-bannis du montant choisi.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 flex-1">
+                <label className="text-xs text-[var(--color-muted)] shrink-0">Montant</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10000}
+                  value={giveWizAmount}
+                  onChange={(e) => setGiveWizAmount(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2 py-1 text-sm text-center text-[var(--color-cream)] outline-none focus:border-[var(--color-accent)]/60"
+                />
+                <span className="text-xs text-[var(--color-muted)] shrink-0">Wiz</span>
+              </div>
+              <Button
+                onClick={handleGiveWiz}
+                disabled={toolLoading === "giveWiz"}
+                className="text-xs shrink-0"
+              >
+                <Zap className="size-3.5 mr-1" />
+                {toolLoading === "giveWiz" ? "En cours…" : "Distribuer"}
+              </Button>
+            </div>
           </Card>
 
           {/* Demo */}

@@ -59,7 +59,7 @@ function BetBadge({
         {jokerUsed && " 🃏"}
       </span>
       <span className="text-[9px] text-[var(--color-muted)]">
-        {amountWizz} Wizz{gain && ` · ${gain}`}
+        {amountWizz} Wiz{gain && ` · ${gain}`}
       </span>
     </div>
   );

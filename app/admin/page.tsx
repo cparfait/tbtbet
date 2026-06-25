@@ -36,7 +36,7 @@ export default async function AdminPage() {
   ];
 
   return (
-    <main className="mx-auto min-h-dvh max-w-md overflow-x-hidden px-4 py-6">
+    <main className="mx-auto min-h-dvh max-w-md md:max-w-2xl lg:max-w-4xl overflow-x-hidden px-4 py-6">
       <Link
         href="/dashboard"
         className="mb-4 inline-flex items-center gap-1 text-sm text-[var(--color-muted)] hover:text-[var(--color-cream)]"

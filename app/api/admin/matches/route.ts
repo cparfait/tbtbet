@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { calculatePayout } from "@/lib/odds";
+import { calculatePayout, DEFAULT_ELO } from "@/lib/odds";
+import { calculateEloChange } from "@/lib/elo";
 import { advanceBracket, tryAutoGenerateBracketR1 } from "@/lib/bracket-advance";
 import { z } from "zod";
 
@@ -29,6 +30,11 @@ const scheduleSchema = z.object({
   id: z.string().min(1),
   scheduledAt: z.string().nullable(),
   bettingClosesAt: z.string().nullable().optional(),
+});
+
+const statusSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum(["LIVE", "SCHEDULED"]),
 });
 
 function adminOnly() {
@@ -62,6 +68,17 @@ export async function PATCH(req: NextRequest) {
   if (!session?.user || session.user.role !== "ADMIN") return adminOnly();
 
   const body = await req.json();
+
+  // Mise à jour du statut LIVE/SCHEDULED uniquement
+  if ("status" in body && !("result" in body) && !("scoreA" in body) && !("scheduledAt" in body)) {
+    const parsed = statusSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: "Données invalides" }, { status: 400 });
+    await prisma.match.update({
+      where: { id: parsed.data.id },
+      data: { status: parsed.data.status },
+    });
+    return NextResponse.json({ success: true });
+  }
 
   // Mise à jour de date uniquement (sans résultat)
   if ("scheduledAt" in body && !("result" in body)) {
@@ -128,10 +145,27 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    // Appliquer le nouveau résultat
+    // ── ELO : calculer le delta en partant des ELO pré-match ──────────────────
+    // Pour une correction, on annule l'ancien delta pour retrouver l'ELO pré-match.
+    const prevEloChangeA = isCorrection ? (match.eloChangeA ?? 0) : 0;
+    const prevEloChangeB = isCorrection ? (match.eloChangeB ?? 0) : 0;
+    const preMatchEloA = match.teamA.elo - prevEloChangeA;
+    const preMatchEloB = (match.teamB?.elo ?? DEFAULT_ELO) - prevEloChangeB;
+    const { changeA: eloChangeA, changeB: eloChangeB } = calculateEloChange(
+      preMatchEloA, preMatchEloB, scoreA, scoreB
+    );
+    // Ajustement net à appliquer (nouveau delta - ancien delta)
+    const eloAdjA = eloChangeA - prevEloChangeA;
+    const eloAdjB = eloChangeB - prevEloChangeB;
+    await tx.team.update({ where: { id: match.teamAId }, data: { elo: { increment: eloAdjA } } });
+    if (match.teamBId) {
+      await tx.team.update({ where: { id: match.teamBId }, data: { elo: { increment: eloAdjB } } });
+    }
+
+    // Appliquer le nouveau résultat (avec les deltas ELO stockés)
     await tx.match.update({
       where: { id },
-      data: { status: "FINISHED", result, scoreA, scoreB },
+      data: { status: "FINISHED", result, scoreA, scoreB, eloChangeA, eloChangeB },
     });
 
     // Régler tous les paris (y compris ceux annulés ci-dessus)

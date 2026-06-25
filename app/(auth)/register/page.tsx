@@ -106,7 +106,7 @@ export default async function RegisterPage() {
         </div>
 
         <p className="mt-4 text-center text-xs text-[var(--color-muted)]/60">
-          En créant un compte, tu obtiens 100 Wizz et 2 Jokers pour parier.
+          En créant un compte, tu obtiens 100 Wiz et 2 Bonus ×2 pour parier.
         </p>
       </div>
     </main>
