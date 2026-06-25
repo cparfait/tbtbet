@@ -249,4 +249,6 @@ La migration DB (`prisma db push`) est exécutée par un container dédié (`mig
 
 *Fait avec ⚽, du café et beaucoup de mauvaise foi entre collègues.*
 
+Merci à **Clem** pour l'idée et **Atlas002** pour le support 🙏
+
 </div>
