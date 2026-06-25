@@ -157,7 +157,7 @@ export function TirageOverlay({ payload, isAdmin, externalStep, onStepChange, on
           onClick={(e) => { e.stopPropagation(); onClose(); }}
           className="bg-[var(--color-accent)] text-black font-bold px-8 py-3 rounded-full text-sm hover:opacity-90 transition-opacity"
         >
-          Voir le bracket →
+          Retour à l&apos;application →
         </button>
       </div>
     </div>
