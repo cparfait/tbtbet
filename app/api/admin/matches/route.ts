@@ -148,7 +148,7 @@ export async function PATCH(req: NextRequest) {
     // Pour une correction, on annule l'ancien delta pour retrouver l'ELO pré-match.
     const prevEloChangeA = isCorrection ? (match.eloChangeA ?? 0) : 0;
     const prevEloChangeB = isCorrection ? (match.eloChangeB ?? 0) : 0;
-    const preMatchEloA = match.teamA.elo - prevEloChangeA;
+    const preMatchEloA = (match.teamA.elo ?? DEFAULT_ELO) - prevEloChangeA;
     const preMatchEloB = (match.teamB?.elo ?? DEFAULT_ELO) - prevEloChangeB;
     const { changeA: eloChangeA, changeB: eloChangeB } = calculateEloChange(
       preMatchEloA, preMatchEloB, scoreA, scoreB
@@ -227,10 +227,11 @@ export async function PATCH(req: NextRequest) {
   });
 
   return NextResponse.json({ success: true, betsSettled: allBets.length, isCorrection });
-  } catch (err) {
-    console.error("[PATCH /api/admin/matches result]", err);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[PATCH /api/admin/matches result]", e);
     return NextResponse.json(
-      { error: "Erreur lors de l'enregistrement du résultat" },
+      { error: `Erreur : ${msg}` },
       { status: 500 }
     );
   }

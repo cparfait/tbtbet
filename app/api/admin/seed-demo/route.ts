@@ -37,6 +37,7 @@ export async function POST() {
     await tx.message.deleteMany();
     await tx.match.deleteMany();
     await tx.finalSeries.deleteMany();
+    await tx.tirageEvent.deleteMany();
     await tx.team.deleteMany();
     await tx.pool.deleteMany();
     await tx.user.deleteMany({ where: { role: { not: "ADMIN" } } });
