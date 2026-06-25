@@ -782,22 +782,19 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                       </div>
                       <div className="flex gap-1 shrink-0 items-center">
                         {match.status !== "FINISHED" && (
-                          <>
-                            <input
-                              type="datetime-local"
-                              className="w-[130px] rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-1.5 py-1 text-[10px] text-[var(--color-cream)] [color-scheme:dark]"
-                              value={match.scheduledAt
-                                ? new Date(match.scheduledAt).toISOString().slice(0, 16)
-                                : ""}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                apiCall("/api/admin/matches", "PATCH", {
-                                  id: match.id,
-                                  scheduledAt: val || null,
-                                }).then(() => ok("Date mise à jour.")).catch(err);
-                              }}
-                            />
-                          </>
+                          <input
+                            type="datetime-local"
+                            className="w-[130px] rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-1.5 py-1 text-[10px] text-[var(--color-cream)] [color-scheme:dark]"
+                            value={editDateMatchId === match.id
+                              ? editDateValue
+                              : (match.scheduledAt ? new Date(match.scheduledAt).toISOString().slice(0, 16) : "")}
+                            onFocus={() => {
+                              setEditDateMatchId(match.id);
+                              setEditDateValue(match.scheduledAt ? new Date(match.scheduledAt).toISOString().slice(0, 16) : "");
+                            }}
+                            onChange={(e) => setEditDateValue(e.target.value)}
+                            onBlur={() => handleSaveMatchDate(match.id)}
+                          />
                         )}
                         <button onClick={() => handleDeleteMatch(match.id)} className="text-red-400 hover:text-red-300">
                           <Trash2 className="size-3.5" />
@@ -860,24 +857,43 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
               </h3>
               <div className="space-y-1">
                 {bracketMatches.map((match) => (
-                  <Card key={match.id} className="flex items-center justify-between p-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium truncate">
-                        {match.label} · <span className="text-[var(--color-muted)]">{match.phase}</span>
-                      </p>
-                      <p className="text-[10px] text-[var(--color-muted)]">
-                        {match.teamA.name} vs {match.teamB?.name ?? "À déterminer"}
-                      </p>
-                      {match.status === "FINISHED" && (
-                        <p className="text-[10px] text-green-400">{match.scoreA} - {match.scoreB}</p>
-                      )}
-                      {match.scheduledAt && (
-                        <p className="text-[10px] text-[var(--color-muted)]">{formatDate(match.scheduledAt)}</p>
-                      )}
+                  <Card key={match.id} className="p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium truncate">
+                          {match.label} · <span className="text-[var(--color-muted)]">{match.phase}</span>
+                        </p>
+                        <p className="text-[10px] text-[var(--color-muted)]">
+                          {match.teamA.name} vs {match.teamB?.name ?? "À déterminer"}
+                        </p>
+                        {match.status === "FINISHED" && (
+                          <p className="text-[10px] text-green-400">{match.scoreA} - {match.scoreB}</p>
+                        )}
+                        {match.scheduledAt && (
+                          <p className="text-[10px] text-[var(--color-muted)]">{formatDate(match.scheduledAt)}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-1 shrink-0 items-center">
+                        {match.status !== "FINISHED" && (
+                          <input
+                            type="datetime-local"
+                            className="w-[130px] rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-1.5 py-1 text-[10px] text-[var(--color-cream)] [color-scheme:dark]"
+                            value={editDateMatchId === match.id
+                              ? editDateValue
+                              : (match.scheduledAt ? new Date(match.scheduledAt).toISOString().slice(0, 16) : "")}
+                            onFocus={() => {
+                              setEditDateMatchId(match.id);
+                              setEditDateValue(match.scheduledAt ? new Date(match.scheduledAt).toISOString().slice(0, 16) : "");
+                            }}
+                            onChange={(e) => setEditDateValue(e.target.value)}
+                            onBlur={() => handleSaveMatchDate(match.id)}
+                          />
+                        )}
+                        <button onClick={() => handleDeleteMatch(match.id)} className="text-red-400 hover:text-red-300 shrink-0">
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
                     </div>
-                    <button onClick={() => handleDeleteMatch(match.id)} className="text-red-400 hover:text-red-300 shrink-0">
-                      <Trash2 className="size-4" />
-                    </button>
                   </Card>
                 ))}
               </div>

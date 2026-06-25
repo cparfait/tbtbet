@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { TeamLogo } from "@/components/team-logo";
 import { X } from "lucide-react";
@@ -28,7 +28,8 @@ interface TirageOverlayProps {
   onClose: () => void;
 }
 
-// Chaque step révèle UNE équipe ou un header
+// Chaque step révèle UNE équipe ou un header — avancé par clic admin
+// step 0  → état initial (rien de visible)
 // step 1  → titre
 // step 2  → header WB
 // step 3  → WB M1 teamA   (la carte WB M1 apparaît avec teamB = ???)
@@ -42,38 +43,27 @@ interface TirageOverlayProps {
 // step 11 → LB M1 teamB
 // step 12 → LB M2 teamA
 // step 13 → LB M2 teamB
-// step 14 → bouton fermer
-const TIMINGS = [
-  400,   // 1 titre
-  900,   // 2 WB header
-  1600,  // 3 WB M1 teamA
-  2500,  // 4 WB M1 teamB
-  3300,  // 5 WB M2 teamA
-  4200,  // 6 WB M2 teamB
-  5000,  // 7 WB M3 teamA
-  5900,  // 8 WB M3 teamB
-  6700,  // 9 LB header
-  7400,  // 10 LB M1 teamA
-  8300,  // 11 LB M1 teamB
-  9100,  // 12 LB M2 teamA
-  10000, // 13 LB M2 teamB
-  11200, // 14 bouton fermer
-];
+// step 14 → bouton fermer (fin)
+const MAX_STEP = 14;
 
 export function TirageOverlay({ payload, onClose }: TirageOverlayProps) {
   const [step, setStep] = useState(0);
 
-  useEffect(() => {
-    const timers = TIMINGS.map((t, i) => setTimeout(() => setStep(i + 1), t));
-    return () => timers.forEach(clearTimeout);
-  }, []);
+  const advance = () => setStep((s) => Math.min(s + 1, MAX_STEP));
 
-  // WB pair i : carte visible quand step >= 3 + i*2, teamA quand idem, teamB quand step >= 4 + i*2
-  // LB pair i : carte visible quand step >= 10 + i*2, teamB quand step >= 11 + i*2
+  // Clic sur l'overlay = avancer (sauf si on est à la fin)
+  const handleOverlayClick = () => {
+    if (step < MAX_STEP) advance();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md overflow-y-auto py-8 px-4">
+    <div
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md overflow-y-auto py-8 px-4"
+      onClick={handleOverlayClick}
+      style={{ cursor: step < MAX_STEP ? "pointer" : "default" }}
+    >
       <button
-        onClick={onClose}
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
         className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
         aria-label="Fermer"
       >
@@ -134,15 +124,27 @@ export function TirageOverlay({ payload, onClose }: TirageOverlayProps) {
         </section>
       </div>
 
-      {/* CTA */}
+      {/* Indicateur clic — visible tant que l'animation n'est pas terminée */}
       <div
         className={cn(
-          "mt-10 transition-all duration-700",
-          step >= 14 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
+          "mt-8 transition-all duration-500",
+          step < MAX_STEP ? "opacity-60" : "opacity-0 pointer-events-none"
+        )}
+      >
+        <p className="text-xs text-gray-400 uppercase tracking-widest animate-pulse">
+          Cliquez pour révéler
+        </p>
+      </div>
+
+      {/* CTA fin */}
+      <div
+        className={cn(
+          "mt-4 transition-all duration-700",
+          step >= MAX_STEP ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
         )}
       >
         <button
-          onClick={onClose}
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
           className="bg-[var(--color-accent)] text-black font-bold px-8 py-3 rounded-full text-sm hover:opacity-90 transition-opacity"
         >
           Voir le bracket →
