@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TirageOverlay, type TiragePayload } from "@/components/tirage-overlay";
 
 const SEEN_KEY = "tbt_tirage_seen_v1";
@@ -21,8 +21,14 @@ function markSeen(id: string) {
   }
 }
 
-export function TiragePoller() {
+interface Props {
+  isAdmin: boolean;
+}
+
+export function TiragePoller({ isAdmin }: Props) {
   const [active, setActive] = useState<{ id: string; payload: TiragePayload } | null>(null);
+  const [remoteStep, setRemoteStep] = useState(0);
+  const activeIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,12 +40,22 @@ export function TiragePoller() {
         const data = (await res.json()) as {
           id: string;
           payload: TiragePayload;
+          currentStep: number;
           createdAt: string;
         } | null;
-        if (!data) return;
+        if (!data || cancelled) return;
+
         const seen = getSeenIds();
-        if (!seen.includes(data.id) && !cancelled) {
-          setActive({ id: data.id, payload: data.payload });
+        if (!seen.includes(data.id)) {
+          // Nouvel événement non vu
+          if (activeIdRef.current !== data.id) {
+            activeIdRef.current = data.id;
+            setActive({ id: data.id, payload: data.payload });
+            setRemoteStep(data.currentStep ?? 0);
+          } else {
+            // Même événement déjà affiché — mettre à jour le step pour les viewers
+            setRemoteStep(data.currentStep ?? 0);
+          }
         }
       } catch {
         // silently ignore network errors
@@ -47,20 +63,40 @@ export function TiragePoller() {
     }
 
     check();
-    const timer = setInterval(check, 3000);
+    // Admin poll lent (3s), viewers poll rapide (1s) pour suivre les clics admin
+    const interval = setInterval(check, isAdmin ? 3000 : 1000);
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      clearInterval(interval);
     };
-  }, []);
+  }, [isAdmin]);
 
-  if (!active) return null;
+  async function handleStepChange(step: number) {
+    if (!active) return;
+    await fetch("/api/admin/tirage", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: active.id, step }),
+    }).catch(() => {});
+  }
 
   function handleClose() {
     if (!active) return;
     markSeen(active.id);
+    activeIdRef.current = null;
     setActive(null);
+    setRemoteStep(0);
   }
 
-  return <TirageOverlay payload={active.payload} onClose={handleClose} />;
+  if (!active) return null;
+
+  return (
+    <TirageOverlay
+      payload={active.payload}
+      isAdmin={isAdmin}
+      externalStep={isAdmin ? undefined : remoteStep}
+      onStepChange={isAdmin ? handleStepChange : undefined}
+      onClose={handleClose}
+    />
+  );
 }

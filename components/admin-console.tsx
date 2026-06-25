@@ -142,6 +142,7 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
 
   // Tirage au sort
   const [tiragePayload, setTiragePayload] = useState<TiragePayload | null>(null);
+  const [tirageEventId, setTirageEventId] = useState<string | null>(null);
   const [tirageLoading, setTirageLoading] = useState(false);
 
   async function apiCall(url: string, method: string, body?: Record<string, unknown>) {
@@ -356,11 +357,38 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
   async function handleLancerTirage() {
     setTirageLoading(true);
     try {
-      const data = await apiCall("/api/admin/tirage", "POST") as { success: boolean; payload: TiragePayload };
+      const data = await apiCall("/api/admin/tirage", "POST") as { success: boolean; payload: TiragePayload; eventId: string };
       setTiragePayload(data.payload);
+      setTirageEventId(data.eventId ?? null);
       router.refresh();
     } catch (e) { err(e); }
     finally { setTirageLoading(false); }
+  }
+
+  async function handleTirageStepChange(step: number) {
+    if (!tirageEventId) return;
+    await fetch("/api/admin/tirage", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: tirageEventId, step }),
+    }).catch(() => {});
+  }
+
+  function handleTirageClose() {
+    // Marquer l'event comme vu dans localStorage pour que TiragePoller
+    // ne le réaffiche pas si l'admin navigue vers une page (app)
+    if (tirageEventId) {
+      try {
+        const key = "tbt_tirage_seen_v1";
+        const seen: string[] = JSON.parse(localStorage.getItem(key) ?? "[]");
+        if (!seen.includes(tirageEventId)) {
+          seen.push(tirageEventId);
+          localStorage.setItem(key, JSON.stringify(seen));
+        }
+      } catch { /* ignore */ }
+    }
+    setTiragePayload(null);
+    setTirageEventId(null);
   }
 
   // ── Tools ──
@@ -452,7 +480,12 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
     <div className="space-y-4">
       {/* Overlay tirage admin */}
       {tiragePayload && (
-        <TirageOverlay payload={tiragePayload} onClose={() => setTiragePayload(null)} />
+        <TirageOverlay
+          payload={tiragePayload}
+          isAdmin={true}
+          onStepChange={handleTirageStepChange}
+          onClose={handleTirageClose}
+        />
       )}
 
       {/* Input fichier caché — partagé par tous les logos */}

@@ -265,9 +265,10 @@ model VerificationToken {
 // ─────────────────────────────────────────────
 
 model TirageEvent {
-  id        String   @id @default(cuid())
-  payload   Json
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  payload     Json
+  currentStep Int      @default(0)
+  createdAt   DateTime @default(now())
 }
 
 // ─────────────────────────────────────────────

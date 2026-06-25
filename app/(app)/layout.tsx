@@ -27,7 +27,7 @@ export default async function AppLayout({
       </main>
       <BottomNav isAdmin={user?.role === "ADMIN"} />
       {showWelcome && <WelcomeModal initialName={user.name ?? ""} />}
-      <TiragePoller />
+      <TiragePoller isAdmin={user?.role === "ADMIN"} />
     </div>
   );
 }

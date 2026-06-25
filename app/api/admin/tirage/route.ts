@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -162,5 +162,16 @@ export async function POST() {
     await tx.tirageEvent.create({ data: { payload } });
   });
 
-  return NextResponse.json({ success: true, payload });
+  const event = await prisma.tirageEvent.findFirst({ orderBy: { createdAt: "desc" } });
+  return NextResponse.json({ success: true, payload, eventId: event?.id });
+}
+
+export async function PATCH(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+  }
+  const { id, step } = await req.json() as { id: string; step: number };
+  await prisma.tirageEvent.update({ where: { id }, data: { currentStep: step } });
+  return NextResponse.json({ success: true });
 }

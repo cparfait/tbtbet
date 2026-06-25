@@ -25,6 +25,9 @@ export interface TiragePayload {
 
 interface TirageOverlayProps {
   payload: TiragePayload;
+  isAdmin: boolean;
+  externalStep?: number; // viewer mode : step piloté depuis l'extérieur
+  onStepChange?: (step: number) => void; // admin mode : appelé à chaque avancement
   onClose: () => void;
 }
 
@@ -46,21 +49,28 @@ interface TirageOverlayProps {
 // step 14 → bouton fermer (fin)
 const MAX_STEP = 14;
 
-export function TirageOverlay({ payload, onClose }: TirageOverlayProps) {
-  const [step, setStep] = useState(0);
+export function TirageOverlay({ payload, isAdmin, externalStep, onStepChange, onClose }: TirageOverlayProps) {
+  const [localStep, setLocalStep] = useState(0);
 
-  const advance = () => setStep((s) => Math.min(s + 1, MAX_STEP));
+  // En mode viewer, le step est piloté par l'admin via externalStep
+  const step = isAdmin ? localStep : (externalStep ?? 0);
 
-  // Clic sur l'overlay = avancer (sauf si on est à la fin)
+  const advance = () => {
+    if (!isAdmin) return;
+    const next = Math.min(localStep + 1, MAX_STEP);
+    setLocalStep(next);
+    onStepChange?.(next);
+  };
+
   const handleOverlayClick = () => {
-    if (step < MAX_STEP) advance();
+    if (isAdmin && localStep < MAX_STEP) advance();
   };
 
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md overflow-y-auto py-8 px-4"
-      onClick={handleOverlayClick}
-      style={{ cursor: step < MAX_STEP ? "pointer" : "default" }}
+      onClick={isAdmin ? handleOverlayClick : undefined}
+      style={{ cursor: isAdmin && step < MAX_STEP ? "pointer" : "default" }}
     >
       <button
         onClick={(e) => { e.stopPropagation(); onClose(); }}
@@ -124,7 +134,7 @@ export function TirageOverlay({ payload, onClose }: TirageOverlayProps) {
         </section>
       </div>
 
-      {/* Indicateur clic — visible tant que l'animation n'est pas terminée */}
+      {/* Indicateur — admin : cliquer pour révéler / viewer : en attente */}
       <div
         className={cn(
           "mt-8 transition-all duration-500",
@@ -132,7 +142,7 @@ export function TirageOverlay({ payload, onClose }: TirageOverlayProps) {
         )}
       >
         <p className="text-xs text-gray-400 uppercase tracking-widest animate-pulse">
-          Cliquez pour révéler
+          {isAdmin ? "Cliquez pour révéler" : "Tirage en cours…"}
         </p>
       </div>
 
