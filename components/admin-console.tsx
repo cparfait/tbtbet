@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn, dayKey, dayLabel, formatKickoffTime } from "@/lib/utils";
 import { TeamLogo } from "@/components/team-logo";
-import { Users, Swords, Trophy, Plus, Trash2, CheckCircle2, Calendar, RefreshCw, ImageIcon, Upload, Wrench, RotateCcw, Sparkles, Zap, TrendingUp } from "lucide-react";
+import { Users, Swords, Trophy, Plus, Trash2, CheckCircle2, Calendar, RefreshCw, ImageIcon, Upload, Wrench, RotateCcw, Sparkles, Zap, TrendingUp, Shuffle } from "lucide-react";
+import { TirageOverlay, type TiragePayload } from "@/components/tirage-overlay";
 
 // ── Types ──
 
@@ -66,7 +67,7 @@ interface AdminConsoleProps {
   currentUserId: string;
 }
 
-type Tab = "teams" | "pools" | "matches" | "results" | "users" | "tools" | "elo";
+type Tab = "teams" | "pools" | "matches" | "results" | "users" | "tools" | "elo" | "tirage";
 
 const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
   { key: "teams", label: "Équipes", icon: Swords },
@@ -75,6 +76,7 @@ const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
   { key: "results", label: "Résultats", icon: CheckCircle2 },
   { key: "users", label: "Joueurs", icon: Users },
   { key: "elo", label: "ELO", icon: TrendingUp },
+  { key: "tirage", label: "Tirage", icon: Shuffle },
   { key: "tools", label: "Outils", icon: Wrench },
 ];
 
@@ -137,6 +139,10 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
 
   // ELO inline editing (teamId → value as string)
   const [eloEdits, setEloEdits] = useState<Record<string, string>>({});
+
+  // Tirage au sort
+  const [tiragePayload, setTiragePayload] = useState<TiragePayload | null>(null);
+  const [tirageLoading, setTirageLoading] = useState(false);
 
   async function apiCall(url: string, method: string, body?: Record<string, unknown>) {
     const res = await fetch(url, {
@@ -346,6 +352,17 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
     } catch (e) { err(e); }
   }
 
+  // ── Tirage ──
+  async function handleLancerTirage() {
+    setTirageLoading(true);
+    try {
+      const data = await apiCall("/api/admin/tirage", "POST") as { success: boolean; payload: TiragePayload };
+      setTiragePayload(data.payload);
+      router.refresh();
+    } catch (e) { err(e); }
+    finally { setTirageLoading(false); }
+  }
+
   // ── Tools ──
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDemo, setConfirmDemo] = useState(false);
@@ -426,8 +443,18 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
     return new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   };
 
+  // Statut pour l'onglet tirage
+  const poolsDone = matches.filter((m) => m.phase === "POOL" && m.status !== "FINISHED").length === 0;
+  const hasPools = matches.some((m) => m.phase === "POOL");
+  const bracketExists = matches.some((m) => ["WINNER_BRACKET", "LOSER_BRACKET"].includes(m.phase));
+
   return (
     <div className="space-y-4">
+      {/* Overlay tirage admin */}
+      {tiragePayload && (
+        <TirageOverlay payload={tiragePayload} onClose={() => setTiragePayload(null)} />
+      )}
+
       {/* Input fichier caché — partagé par tous les logos */}
       <input
         ref={fileInputRef}
@@ -1224,6 +1251,85 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
         </div>
       )}
 
+      {/* ── Tirage ── */}
+      {tab === "tirage" && (
+        <div className="space-y-4">
+          {/* Status */}
+          <Card className="p-4 space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Shuffle className="size-4 text-[var(--color-accent)]" />
+              Tirage au sort du bracket
+            </h3>
+
+            <div className="space-y-1.5">
+              <StatusRow
+                label="Matchs de poule"
+                ok={hasPools && poolsDone}
+                text={!hasPools ? "Aucun match de poule" : poolsDone ? "Tous terminés ✓" : "En cours…"}
+              />
+              <StatusRow
+                label="Bracket"
+                ok={!bracketExists}
+                text={bracketExists ? "Matchs bracket existants" : "Vide — prêt pour le tirage"}
+                invert
+              />
+            </div>
+
+            <p className="text-[11px] text-[var(--color-muted)] leading-relaxed">
+              Le tirage crée aléatoirement les matchs WB et LB du Tour 1 et envoie l&apos;animation à tous les joueurs en temps réel.
+            </p>
+
+            <Button
+              onClick={handleLancerTirage}
+              disabled={tirageLoading || !hasPools || !poolsDone || bracketExists}
+              className="w-full bg-[var(--color-accent)] text-black font-bold hover:opacity-90 disabled:opacity-40"
+            >
+              {tirageLoading ? "Tirage en cours…" : bracketExists ? "Bracket déjà généré" : "🎲 Lancer le tirage au sort"}
+            </Button>
+
+            {bracketExists && (
+              <p className="text-[10px] text-[var(--color-muted)] text-center">
+                Pour relancer, supprimez d&apos;abord les matchs bracket dans l&apos;onglet Matchs.
+              </p>
+            )}
+          </Card>
+
+          {/* Bracket existant résumé */}
+          {bracketExists && (
+            <Card className="p-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+                Bracket actuel
+              </h4>
+              {["WINNER_BRACKET", "LOSER_BRACKET"].map((phase) => {
+                const phaseMatches = matches.filter((m) => m.phase === phase);
+                if (phaseMatches.length === 0) return null;
+                const label = phase === "WINNER_BRACKET" ? "Winner Bracket" : "Loser Bracket";
+                const color = phase === "WINNER_BRACKET" ? "#F5C400" : "#F97316";
+                return (
+                  <div key={phase}>
+                    <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5" style={{ color }}>
+                      {label}
+                    </p>
+                    <div className="space-y-1">
+                      {phaseMatches.map((m) => (
+                        <div key={m.id} className="flex items-center gap-2 text-xs py-1">
+                          <span className="flex-1 truncate font-medium">{m.teamA.name}</span>
+                          <span className="shrink-0 text-[var(--color-muted)]">vs</span>
+                          <span className="flex-1 truncate font-medium text-right">{m.teamB?.name ?? "?"}</span>
+                          {m.status === "FINISHED" && (
+                            <span className="shrink-0 text-[10px] text-green-400 font-bold">✓ {m.scoreA}-{m.scoreB}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* ── ELO ── */}
       {tab === "elo" && (() => {
         const teamsByElo = [...teams].sort((a, b) => b.elo - a.elo);
@@ -1427,6 +1533,28 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
           </Card>
         </div>
       )}
+    </div>
+  );
+}
+
+function StatusRow({
+  label,
+  ok,
+  text,
+  invert = false,
+}: {
+  label: string;
+  ok: boolean;
+  text: string;
+  invert?: boolean;
+}) {
+  const isGood = invert ? !ok : ok;
+  return (
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <span className="text-[var(--color-muted)]">{label}</span>
+      <span className={isGood ? "text-green-400 font-semibold" : "text-yellow-400 font-semibold"}>
+        {text}
+      </span>
     </div>
   );
 }

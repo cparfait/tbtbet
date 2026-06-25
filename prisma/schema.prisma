@@ -261,6 +261,16 @@ model VerificationToken {
 }
 
 // ─────────────────────────────────────────────
+// Tirage au sort
+// ─────────────────────────────────────────────
+
+model TirageEvent {
+  id        String   @id @default(cuid())
+  payload   Json
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────
 // Enums
 // ─────────────────────────────────────────────
 
