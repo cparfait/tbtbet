@@ -103,7 +103,7 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
             <>
               {/* ── Podium ── */}
               {top3.length > 0 && (
-                <div className="flex items-end justify-center gap-3 px-2 pt-4 pb-8">
+                <div className="flex items-end justify-center gap-4 md:gap-10 px-2 pt-4 pb-8">
                   {top3[1] && (
                     <PodiumCard rank={2} name={top3[1].name || "Anonyme"} avatarUrl={top3[1].avatarUrl} points={top3[1].wizzBalance} index={1} />
                   )}
@@ -124,7 +124,7 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
               )}
 
               {/* ── Classement complet ── */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="space-y-1.5">
               {leaderboard.map((user, i) => (
                 <Link
                   key={user.id}
@@ -133,31 +133,34 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
                 >
                   <Card
                     className={cn(
-                      "flex items-center gap-3 p-3 transition-colors",
+                      "flex items-center gap-4 px-4 py-3 transition-colors",
                       i === 0 && "border-[var(--color-gold)]/30 bg-[var(--color-gold)]/[0.04]",
                       user.id === currentUserId
                         ? "border-[var(--color-accent)]/30 bg-[var(--color-accent)]/5"
                         : "hover:border-[var(--color-accent)]/20"
                     )}
                   >
-                     {/* Rang + évolution */}
-                     <div className="flex w-9 shrink-0 flex-col items-center">
-                       <span className="font-[family-name:var(--font-display)] text-lg font-bold leading-none">
-                         {MEDALS[i] ?? i + 1}
-                       </span>
-                       <Evolution value={user.evolution} />
-                     </div>
-                    <UserAvatar src={user.avatarUrl} name={user.name} className="size-8 shrink-0" />
+                    {/* Rang + évolution */}
+                    <div className="flex w-10 shrink-0 flex-col items-center gap-0.5">
+                      <span className="font-[family-name:var(--font-display)] text-xl font-bold leading-none">
+                        {MEDALS[i] ?? <span className="text-base text-[var(--color-muted)]">{i + 1}</span>}
+                      </span>
+                      <Evolution value={user.evolution} />
+                    </div>
+
+                    <UserAvatar src={user.avatarUrl} name={user.name} className="size-9 md:size-10 shrink-0" />
+
                     <div className="flex-1 min-w-0">
-                      <p className={cn("text-sm font-medium truncate", i === 0 && "font-bold")}>
+                      <p className={cn("text-sm md:text-base font-medium truncate", i === 0 && "font-bold")}>
                         {user.name || "Anonyme"}
                         {user.id === currentUserId && (
                           <span className="ml-1.5 text-[10px] text-[var(--color-muted)]">(toi)</span>
                         )}
                       </p>
                     </div>
+
                     <p className={cn(
-                      "shrink-0 text-sm font-bold tabular-nums",
+                      "shrink-0 text-sm md:text-base font-bold tabular-nums",
                       i === 0 ? "text-[var(--color-gold-bright)]" : "text-[var(--color-accent)]"
                     )}>
                       {user.wizzBalance} Wiz
@@ -194,7 +197,7 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
               Aucune poule configurée.
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {poolStandings.map((pool) => (
               <div key={pool.id}>
                 {/* Header de poule coloré */}
