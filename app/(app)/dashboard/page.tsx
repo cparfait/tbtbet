@@ -19,7 +19,6 @@ import { getOddsForTeam, DEFAULT_ELO } from "@/lib/odds";
 import Link from "next/link";
 import { Zap, Star, Target, ChevronRight, Clock, TrendingUp } from "lucide-react";
 import { InstallBanner } from "@/components/install-banner";
-import { TiragePoller } from "@/components/tirage-poller";
 
 export const metadata = { title: "Accueil · TBT Bet" };
 export const dynamic = "force-dynamic";
@@ -107,7 +106,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-5 pt-1">
-      <TiragePoller />
       <PageHeader
         title={`Salut ${firstName}`}
         subtitle="Prêt à parier ?"

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { maybeInit } from "@/lib/init";
 import { BottomNav } from "@/components/bottom-nav";
 import { WelcomeModal } from "@/components/welcome-modal";
+import { TiragePoller } from "@/components/tirage-poller";
 import { getUserById } from "@/lib/data/queries";
 
 export default async function AppLayout({
@@ -26,6 +27,7 @@ export default async function AppLayout({
       </main>
       <BottomNav isAdmin={user?.role === "ADMIN"} />
       {showWelcome && <WelcomeModal initialName={user.name ?? ""} />}
+      <TiragePoller />
     </div>
   );
 }
