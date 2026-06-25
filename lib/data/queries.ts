@@ -254,7 +254,7 @@ export async function getChampionBetsByTeam() {
 
 export async function getLeaderboard() {
   const users = await prisma.user.findMany({
-    where: { banned: false, role: "USER" },
+    where: { banned: false, email: { not: "admin@tbtbet.local" } },
     select: {
       id: true,
       name: true,
@@ -289,7 +289,7 @@ export async function getLeaderboard() {
 /** Snapshot les rangs actuels du classement (à appeler après règlement des paris). */
 export async function snapshotRanks() {
   const users = await prisma.user.findMany({
-    where: { banned: false, role: "USER" },
+    where: { banned: false, email: { not: "admin@tbtbet.local" } },
     orderBy: { wizzBalance: "desc" },
     select: { id: true },
   });
