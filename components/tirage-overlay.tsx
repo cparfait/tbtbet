@@ -28,17 +28,37 @@ interface TirageOverlayProps {
   onClose: () => void;
 }
 
-// Timings (ms) pour chaque step
-//  1 → titre
-//  2 → header WB
-//  3 → WB paire 1
-//  4 → WB paire 2
-//  5 → WB paire 3
-//  6 → header LB
-//  7 → LB paire 1
-//  8 → LB paire 2
-//  9 → bouton fermer
-const TIMINGS = [400, 1000, 1900, 2800, 3700, 4500, 5300, 6200, 7400];
+// Chaque step révèle UNE équipe ou un header
+// step 1  → titre
+// step 2  → header WB
+// step 3  → WB M1 teamA   (la carte WB M1 apparaît avec teamB = ???)
+// step 4  → WB M1 teamB
+// step 5  → WB M2 teamA
+// step 6  → WB M2 teamB
+// step 7  → WB M3 teamA
+// step 8  → WB M3 teamB
+// step 9  → header LB
+// step 10 → LB M1 teamA
+// step 11 → LB M1 teamB
+// step 12 → LB M2 teamA
+// step 13 → LB M2 teamB
+// step 14 → bouton fermer
+const TIMINGS = [
+  400,   // 1 titre
+  900,   // 2 WB header
+  1600,  // 3 WB M1 teamA
+  2500,  // 4 WB M1 teamB
+  3300,  // 5 WB M2 teamA
+  4200,  // 6 WB M2 teamB
+  5000,  // 7 WB M3 teamA
+  5900,  // 8 WB M3 teamB
+  6700,  // 9 LB header
+  7400,  // 10 LB M1 teamA
+  8300,  // 11 LB M1 teamB
+  9100,  // 12 LB M2 teamA
+  10000, // 13 LB M2 teamB
+  11200, // 14 bouton fermer
+];
 
 export function TirageOverlay({ payload, onClose }: TirageOverlayProps) {
   const [step, setStep] = useState(0);
@@ -48,9 +68,10 @@ export function TirageOverlay({ payload, onClose }: TirageOverlayProps) {
     return () => timers.forEach(clearTimeout);
   }, []);
 
+  // WB pair i : carte visible quand step >= 3 + i*2, teamA quand idem, teamB quand step >= 4 + i*2
+  // LB pair i : carte visible quand step >= 10 + i*2, teamB quand step >= 11 + i*2
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md overflow-y-auto py-8 px-4">
-      {/* Fermeture anticipée */}
       <button
         onClick={onClose}
         className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
@@ -66,7 +87,7 @@ export function TirageOverlay({ payload, onClose }: TirageOverlayProps) {
           step >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
         )}
       >
-        <p className="text-5xl mb-3 animate-bounce">🎲</p>
+        <p className="text-5xl mb-3">🎲</p>
         <h1 className="text-3xl font-black text-white tracking-tight">Tirage au sort</h1>
         <p className="text-xs text-gray-500 mt-1.5 uppercase tracking-widest">TBT · Bracket du tournoi</p>
       </div>
@@ -76,19 +97,39 @@ export function TirageOverlay({ payload, onClose }: TirageOverlayProps) {
         <section>
           <SectionHeader label="Winner Bracket" color="#F5C400" visible={step >= 2} />
           <div className="space-y-2.5 mt-3">
-            {payload.wbPairs.map((pair, i) => (
-              <PairCard key={pair.label} pair={pair} color="#F5C400" visible={step >= i + 3} index={i} />
-            ))}
+            {payload.wbPairs.map((pair, i) => {
+              const cardStep = 3 + i * 2;
+              return (
+                <PairCard
+                  key={pair.label}
+                  pair={pair}
+                  color="#F5C400"
+                  cardVisible={step >= cardStep}
+                  teamAVisible={step >= cardStep}
+                  teamBVisible={step >= cardStep + 1}
+                />
+              );
+            })}
           </div>
         </section>
 
         {/* Loser Bracket */}
         <section>
-          <SectionHeader label="Loser Bracket" color="#F97316" visible={step >= 6} />
+          <SectionHeader label="Loser Bracket" color="#F97316" visible={step >= 9} />
           <div className="space-y-2.5 mt-3">
-            {payload.lbPairs.map((pair, i) => (
-              <PairCard key={pair.label} pair={pair} color="#F97316" visible={step >= i + 7} index={i} />
-            ))}
+            {payload.lbPairs.map((pair, i) => {
+              const cardStep = 10 + i * 2;
+              return (
+                <PairCard
+                  key={pair.label}
+                  pair={pair}
+                  color="#F97316"
+                  cardVisible={step >= cardStep}
+                  teamAVisible={step >= cardStep}
+                  teamBVisible={step >= cardStep + 1}
+                />
+              );
+            })}
           </div>
         </section>
       </div>
@@ -97,7 +138,7 @@ export function TirageOverlay({ payload, onClose }: TirageOverlayProps) {
       <div
         className={cn(
           "mt-10 transition-all duration-700",
-          step >= 9 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
+          step >= 14 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
         )}
       >
         <button
@@ -131,29 +172,30 @@ function SectionHeader({ label, color, visible }: { label: string; color: string
 function PairCard({
   pair,
   color,
-  visible,
-  index,
+  cardVisible,
+  teamAVisible,
+  teamBVisible,
 }: {
   pair: TiragePairData;
   color: string;
-  visible: boolean;
-  index: number;
+  cardVisible: boolean;
+  teamAVisible: boolean;
+  teamBVisible: boolean;
 }) {
   return (
     <div
       className={cn(
-        "rounded-xl p-4 border border-white/10 bg-white/5 transition-all",
-        visible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-6 scale-95"
+        "rounded-xl p-4 border border-white/10 bg-white/5 transition-all duration-600",
+        cardVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
       )}
-      style={{ transitionDuration: "600ms", transitionDelay: visible ? `${index * 60}ms` : "0ms" }}
     >
       <p className="text-[9px] font-bold uppercase tracking-widest mb-3" style={{ color }}>
         {pair.label}
       </p>
       <div className="flex items-center gap-3">
-        <TeamSlot team={pair.teamA} color={color} />
+        <TeamSlot team={pair.teamA} visible={teamAVisible} color={color} />
         <span className="shrink-0 text-gray-600 font-black text-xs">VS</span>
-        <TeamSlot team={pair.teamB} color={color} align="right" />
+        <TeamSlot team={pair.teamB} visible={teamBVisible} color={color} align="right" />
       </div>
     </div>
   );
@@ -161,20 +203,49 @@ function PairCard({
 
 function TeamSlot({
   team,
+  visible,
   color,
   align = "left",
 }: {
   team: TirageTeamData;
+  visible: boolean;
   color: string;
   align?: "left" | "right";
 }) {
   return (
     <div className={cn("flex-1 flex items-center gap-2", align === "right" && "flex-row-reverse")}>
-      <TeamLogo url={team.logoUrl} name={team.name} className="size-10 rounded-lg shrink-0" />
-      <div className={cn(align === "right" && "text-right")}>
-        <p className="text-sm font-bold text-white leading-tight">{team.name}</p>
-        <p className="text-[10px] font-semibold mt-0.5" style={{ color }}>
-          {team.seed}
+      {/* Logo */}
+      <div
+        className={cn(
+          "size-10 rounded-lg shrink-0 overflow-hidden transition-all duration-500 flex items-center justify-center",
+          visible ? "bg-transparent" : "bg-white/10 animate-pulse"
+        )}
+      >
+        {visible ? (
+          <TeamLogo url={team.logoUrl} name={team.name} className="size-full" />
+        ) : (
+          <span className="text-base">🎲</span>
+        )}
+      </div>
+
+      {/* Nom */}
+      <div className={cn("transition-all duration-400", align === "right" && "text-right")}>
+        <p
+          className={cn(
+            "text-sm font-bold leading-tight transition-all duration-400",
+            visible ? "text-white" : "text-white/25"
+          )}
+        >
+          {visible ? team.name : "???"}
+        </p>
+        <p
+          className={cn(
+            "text-[10px] font-semibold mt-0.5 transition-all duration-400",
+            visible ? "opacity-100" : "opacity-0"
+          )}
+          style={{ color }}
+        >
+          {visible ? team.seed : "—"}
         </p>
       </div>
     </div>
