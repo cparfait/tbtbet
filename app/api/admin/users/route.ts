@@ -62,3 +62,18 @@ export async function PATCH(req: NextRequest) {
   await prisma.user.update({ where: { id }, data });
   return NextResponse.json({ success: true });
 }
+
+export async function DELETE(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "ADMIN") return adminOnly();
+
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "id manquant" }, { status: 400 });
+  if (id === session.user.id) {
+    return NextResponse.json({ error: "Impossible de supprimer son propre compte" }, { status: 400 });
+  }
+
+  await prisma.user.delete({ where: { id } });
+  return NextResponse.json({ success: true });
+}

@@ -8,6 +8,14 @@ const schema = z.object({
   avatarUrl: z.string().url().nullable().optional(),
 });
 
+export async function DELETE(_req: NextRequest) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+
+  await prisma.user.delete({ where: { id: session.user.id } });
+  return NextResponse.json({ success: true });
+}
+
 export async function PATCH(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });

@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, Loader2, Pencil, Check, X } from "lucide-react";
+import { signOut } from "next-auth/react";
+import { Camera, Loader2, Pencil, Check, X, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MAX_SIZE = 512 * 1024;
@@ -26,6 +27,8 @@ export function ProfileForm({ currentName, currentAvatarUrl, email, role, initia
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -50,6 +53,22 @@ export function ProfileForm({ currentName, currentAvatarUrl, email, role, initia
     } finally {
       setUploading(false);
       e.target.value = "";
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/profile", { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Erreur");
+      }
+      await signOut({ callbackUrl: "/" });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erreur");
+      setDeleting(false);
     }
   }
 
@@ -171,6 +190,41 @@ export function ProfileForm({ currentName, currentAvatarUrl, email, role, initia
         className="sr-only"
         onChange={handleAvatarChange}
       />
+
+      {/* Supprimer le compte */}
+      <div className="pt-2 border-t border-[var(--color-border-subtle)]">
+        {confirmDelete ? (
+          <div className="space-y-2">
+            <p className="text-xs text-red-400 font-medium">
+              ⚠ Cette action est irréversible. Ton compte et tous tes paris seront supprimés définitivement.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                className="flex-1 rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+              >
+                {deleting ? "Suppression…" : "Oui, supprimer mon compte"}
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+                className="flex-1 rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 text-xs text-[var(--color-muted)] hover:text-[var(--color-cream)] transition-colors"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="flex items-center gap-1.5 text-xs text-red-400/70 hover:text-red-400 transition-colors"
+          >
+            <Trash2 className="size-3.5" />
+            Supprimer mon compte
+          </button>
+        )}
+      </div>
     </div>
   );
 }

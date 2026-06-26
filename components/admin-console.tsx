@@ -67,7 +67,7 @@ interface AdminConsoleProps {
   currentUserId: string;
 }
 
-type Tab = "teams" | "pools" | "matches" | "results" | "users" | "tools" | "elo" | "tirage";
+type Tab = "teams" | "pools" | "matches" | "results" | "users" | "tools" | "elo" | "tirage" | "tests";
 
 const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
   { key: "teams", label: "Équipes", icon: Swords },
@@ -78,6 +78,7 @@ const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
   { key: "elo", label: "ELO", icon: TrendingUp },
   { key: "tirage", label: "Tirage", icon: Shuffle },
   { key: "tools", label: "Outils", icon: Wrench },
+  { key: "tests", label: "Tests", icon: Zap },
 ];
 
 const PHASES = [
@@ -136,6 +137,9 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserPassword, setNewUserPassword] = useState("");
   const [newUserRole, setNewUserRole] = useState<"USER" | "ADMIN">("USER");
+
+  // Delete user confirmation
+  const [confirmDeleteUserId, setConfirmDeleteUserId] = useState<string | null>(null);
 
   // ELO inline editing (teamId → value as string)
   const [eloEdits, setEloEdits] = useState<Record<string, string>>({});
@@ -321,6 +325,11 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
     catch (e) { err(e); }
   }
 
+  async function handleDeleteUser(userId: string) {
+    try { await apiCall(`/api/admin/users?id=${userId}`, "DELETE"); setConfirmDeleteUserId(null); ok("Compte supprimé."); }
+    catch (e) { err(e); }
+  }
+
   async function handleToggleRole(userId: string, role: string) {
     const newRole = role === "ADMIN" ? "USER" : "ADMIN";
     try { await apiCall("/api/admin/users", "PATCH", { id: userId, role: newRole }); ok(newRole === "ADMIN" ? "Rôle admin accordé." : "Rôle admin retiré."); }
@@ -409,6 +418,20 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
     }
     setTiragePayload(null);
     setTirageEventId(null);
+  }
+
+  // ── Tests ──
+  const [testLoading, setTestLoading] = useState<string | null>(null);
+  const [confirmTestPhase, setConfirmTestPhase] = useState<string | null>(null);
+
+  async function handleSeedTest(phase: string) {
+    setTestLoading(phase);
+    try {
+      await apiCall("/api/admin/seed-test", "POST", { phase });
+      setConfirmTestPhase(null);
+      ok(`Scénario « ${phase} » chargé (10 joueurs, paris posés).`);
+    } catch (e) { err(e); }
+    finally { setTestLoading(null); }
   }
 
   // ── Tools ──
@@ -1312,6 +1335,30 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                     >
                       {user.banned ? "Débannir" : "Bannir"}
                     </button>
+                    {confirmDeleteUserId === user.id ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="text-xs px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600"
+                        >
+                          Confirmer
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteUserId(null)}
+                          className="text-xs px-2 py-1 rounded bg-[var(--color-surface-2)] text-[var(--color-muted)]"
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteUserId(user.id)}
+                        className="text-red-400 hover:text-red-300"
+                        title="Supprimer le compte"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    )}
                   </div>
                 )}
               </Card>
@@ -1508,6 +1555,91 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
                 </div>
               )}
             </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Tests ── */}
+      {tab === "tests" && (() => {
+        const scenarios = [
+          {
+            key: "pre-pools-end",
+            title: "Fin de poules imminente",
+            color: "#3498DB",
+            icon: "🏆",
+            description: "Poule A : 2/3 matchs terminés. Poule B : terminée. Poule C : 5/6 terminés. 2 matchs restants avec paris en attente.",
+            detail: "10 joueurs · paris sur Sultans/Pharaons et Rapaces/Faucons",
+          },
+          {
+            key: "post-bracket-r1",
+            title: "Fin Tour 1 bracket",
+            color: "#F5C400",
+            icon: "⚡",
+            description: "Toutes les poules terminées. WB R1 et LB R1 joués. WB R2 et LB R2 à venir (4 matchs).",
+            detail: "10 joueurs · paris sur les 4 matchs du tour 2",
+          },
+          {
+            key: "pre-finale",
+            title: "Juste avant la finale",
+            color: "#A78BFA",
+            icon: "🎯",
+            description: "Bracket complet terminé. Les Rapaces (WB) affrontent Les Lions (LB) en Finale BO3 — 3 matchs pré-créés.",
+            detail: "10 joueurs · paris répartis sur les 3 matchs de la finale",
+          },
+        ] as const;
+
+        return (
+          <div className="space-y-3">
+            <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+              Chaque scénario réinitialise complètement la base (équipes, matchs, paris) tout en conservant les comptes admin,
+              puis injecte 10 joueurs démo (<span className="font-mono">Demo1234!</span>) et des paris sur les matchs à venir.
+            </p>
+
+            {scenarios.map((s) => (
+              <Card key={s.key} className="p-4 space-y-3" style={{ borderColor: s.color + "33" }}>
+                <div className="flex items-start gap-3">
+                  <span className="text-xl shrink-0">{s.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold" style={{ color: s.color }}>{s.title}</h3>
+                    <p className="text-xs text-[var(--color-muted)] mt-0.5 leading-relaxed">{s.description}</p>
+                    <p className="text-[10px] mt-1 font-mono" style={{ color: s.color + "cc" }}>{s.detail}</p>
+                  </div>
+                </div>
+
+                {confirmTestPhase === s.key ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-center" style={{ color: s.color }}>
+                      ⚠ Les données actuelles seront remplacées. Confirmer ?
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleSeedTest(s.key)}
+                        disabled={testLoading === s.key}
+                        className="flex-1 text-xs font-bold"
+                        style={{ background: s.color, color: "#000" }}
+                      >
+                        {testLoading === s.key ? "Chargement…" : "Oui, charger"}
+                      </Button>
+                      <Button
+                        onClick={() => setConfirmTestPhase(null)}
+                        className="flex-1 text-xs bg-[var(--color-surface-2)] text-[var(--color-muted)]"
+                      >
+                        Annuler
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => setConfirmTestPhase(s.key)}
+                    disabled={testLoading !== null}
+                    className="w-full text-xs font-semibold"
+                    style={{ background: s.color + "20", color: s.color, border: `1px solid ${s.color}44` }}
+                  >
+                    {s.icon} Charger ce scénario
+                  </Button>
+                )}
+              </Card>
+            ))}
           </div>
         );
       })()}
