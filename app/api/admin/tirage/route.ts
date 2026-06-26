@@ -171,7 +171,13 @@ export async function PATCH(req: NextRequest) {
   if (!session?.user || session.user.role !== "ADMIN") {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
-  const { id, step } = await req.json() as { id: string; step: number };
-  await prisma.tirageEvent.update({ where: { id }, data: { currentStep: step } });
+  const { id, step, end } = await req.json() as { id: string; step?: number; end?: boolean };
+  await prisma.tirageEvent.update({
+    where: { id },
+    data: {
+      ...(step !== undefined && { currentStep: step }),
+      ...(end && { endedAt: new Date() }),
+    },
+  });
   return NextResponse.json({ success: true });
 }

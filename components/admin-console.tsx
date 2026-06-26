@@ -390,9 +390,14 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
   }
 
   function handleTirageClose() {
-    // Marquer l'event comme vu dans localStorage pour que TiragePoller
-    // ne le réaffiche pas si l'admin navigue vers une page (app)
     if (tirageEventId) {
+      // Marquer terminé en DB — les viewers ne le reverront plus
+      fetch("/api/admin/tirage", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: tirageEventId, end: true }),
+      }).catch(() => {});
+      // Aussi dans localStorage pour éviter le flash si le poll répond avant la DB
       try {
         const key = "tbt_tirage_seen_v1";
         const seen: string[] = JSON.parse(localStorage.getItem(key) ?? "[]");
