@@ -17,6 +17,8 @@ export default async function AppLayout({
   maybeInit().catch(() => {});
 
   const user = await getUserById(session.user.id);
+  // JWT valide mais user supprimé en base (ex: rechargement de scénario)
+  if (!user) redirect("/api/auth/force-signout");
 
   const showWelcome = user && !user.hasSeenWelcome;
 

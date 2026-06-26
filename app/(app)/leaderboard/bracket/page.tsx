@@ -86,6 +86,10 @@ export default async function BracketPage() {
     const isFinished = match.status === "FINISHED";
     const hasTBD = !match.teamBId;
     const phaseColor = PHASE_COLOR[match.phase as string];
+    const statsA = bracketStats(match.teamAId);
+    const statsB = match.teamBId ? bracketStats(match.teamBId) : null;
+    const eliminatedA = statsA.losses >= 2;
+    const eliminatedB = statsB ? statsB.losses >= 2 : false;
     return (
       <Link href={`/matches/${match.id}`}>
         <Card className="p-2.5 hover:border-[var(--color-accent)]/30 transition-colors min-w-[160px]">
@@ -94,10 +98,12 @@ export default async function BracketPage() {
             <div className={`flex items-center justify-between gap-2 ${isFinished && match.result === "TEAM_A" ? "text-[var(--color-accent)]" : ""}`}>
               <div className="flex items-center gap-1.5 min-w-0">
                 <TeamLogo url={match.teamA?.logoUrl} name={match.teamA?.name ?? "?"} poolColor={phaseColor} className="size-4 rounded" />
-                <span className="text-xs font-medium truncate">{match.teamA?.name ?? "?"}</span>
+                <span className={`text-xs font-medium truncate${eliminatedA ? " line-through text-red-400" : ""}`}>
+                  {match.teamA?.name ?? "?"}
+                </span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <WLBadge {...bracketStats(match.teamAId)} />
+                <WLBadge {...statsA} />
                 {isFinished && <span className="text-xs font-bold">{match.scoreA}</span>}
               </div>
             </div>
@@ -108,13 +114,15 @@ export default async function BracketPage() {
                 ) : (
                   <>
                     <TeamLogo url={match.teamB?.logoUrl} name={match.teamB?.name ?? "?"} poolColor={phaseColor} className="size-4 rounded" />
-                    <span className="text-xs font-medium truncate">{match.teamB?.name}</span>
+                    <span className={`text-xs font-medium truncate${eliminatedB ? " line-through text-red-400" : ""}`}>
+                      {match.teamB?.name}
+                    </span>
                   </>
                 )}
               </div>
-              {!hasTBD && (
+              {!hasTBD && statsB && (
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <WLBadge {...bracketStats(match.teamBId)} />
+                  <WLBadge {...statsB} />
                   {isFinished && <span className="text-xs font-bold">{match.scoreB}</span>}
                 </div>
               )}

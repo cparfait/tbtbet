@@ -54,7 +54,7 @@ export default async function DashboardPage() {
     getAllTeams(),
   ]);
 
-  if (!user) redirect("/login");
+  if (!user) redirect("/api/auth/force-signout");
 
   const top3 = leaderboard.slice(0, 3);
   const settledBets = bets.filter((b) => b.settled);

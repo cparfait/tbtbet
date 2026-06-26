@@ -46,15 +46,17 @@ export function TiragePoller({ isAdmin }: Props) {
         if (!data || cancelled) return;
 
         const seen = getSeenIds();
-        if (!seen.includes(data.id)) {
+        const currentStep = data.currentStep ?? 0;
+        // Les viewers ne voient l'overlay que quand l'admin a commencé à révéler (step >= 1)
+        if (!seen.includes(data.id) && (isAdmin || currentStep >= 1)) {
           // Nouvel événement non vu
           if (activeIdRef.current !== data.id) {
             activeIdRef.current = data.id;
             setActive({ id: data.id, payload: data.payload });
-            setRemoteStep(data.currentStep ?? 0);
+            setRemoteStep(currentStep);
           } else {
             // Même événement déjà affiché — mettre à jour le step pour les viewers
-            setRemoteStep(data.currentStep ?? 0);
+            setRemoteStep(currentStep);
           }
         }
       } catch {

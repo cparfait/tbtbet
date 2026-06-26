@@ -11,6 +11,26 @@ import { UserAvatar } from "@/components/user-avatar";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+interface BracketTeam {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+}
+
+interface BracketMatch {
+  id: string;
+  phase: string;
+  round: number | null;
+  status: string;
+  result: string | null;
+  scoreA: number | null;
+  scoreB: number | null;
+  teamAId: string;
+  teamBId: string | null;
+  teamA: BracketTeam;
+  teamB: BracketTeam | null;
+}
+
 const MEDALS = ["\u{1F947}", "\u{1F948}", "\u{1F949}"];
 
 interface LeaderboardUser {
@@ -54,11 +74,12 @@ interface Props {
   finalSeries: FinalSeries | null;
   currentUserId: string;
   hasBracketPhase?: boolean;
+  bracketMatches?: BracketMatch[];
 }
 
 // ── Composant principal ────────────────────────────────────────────────────────
 
-export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, currentUserId, hasBracketPhase = false }: Props) {
+export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, currentUserId, hasBracketPhase = false, bracketMatches = [] }: Props) {
   const [tab, setTab] = useState<"players" | "teams">("players");
 
   const top3 = leaderboard.slice(0, 3);
@@ -178,10 +199,13 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
       {tab === "teams" && (
         <div className="space-y-4">
 
-          {/* Bracket en premier si phase bracket active */}
-          {hasBracketPhase && (
+          {/* ── Bracket inline si phase bracket active ── */}
+          {hasBracketPhase && bracketMatches.length > 0 ? (
+            <BracketInline matches={bracketMatches} finalSeries={finalSeries} />
+          ) : (
+            /* Lien vers le bracket si pas encore commencé */
             <Link href="/leaderboard/bracket">
-              <Card className="flex items-center justify-between p-3 border-[var(--color-accent)]/20 hover:border-[var(--color-accent)]/40 transition-colors">
+              <Card className="flex items-center justify-between p-3 hover:border-[var(--color-accent)]/30 transition-colors">
                 <div>
                   <p className="text-sm font-semibold">Bracket double élimination</p>
                   <p className="text-[10px] text-[var(--color-muted)]">Winners · Losers · Finale BO3</p>
@@ -191,7 +215,18 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
             </Link>
           )}
 
-          {/* Classements de poules */}
+          {/* ── Séparateur entre bracket et poules ── */}
+          {hasBracketPhase && poolStandings.length > 0 && (
+            <div className="flex items-center gap-3 pt-2">
+              <div className="h-px flex-1 bg-[var(--color-border-subtle)]" />
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-muted)]">
+                Phase de poules
+              </span>
+              <div className="h-px flex-1 bg-[var(--color-border-subtle)]" />
+            </div>
+          )}
+
+          {/* ── Classements de poules ── */}
           {poolStandings.length === 0 ? (
             <Card className="p-4 text-center text-sm text-[var(--color-muted)]">
               Aucune poule configurée.
@@ -200,7 +235,6 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {poolStandings.map((pool) => (
               <div key={pool.id}>
-                {/* Header de poule coloré */}
                 <div
                   className="mb-1.5 rounded-xl px-3 py-2 flex items-center justify-between"
                   style={{ background: pool.color + "20", borderLeft: `3px solid ${pool.color}` }}
@@ -215,7 +249,6 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
                   </Link>
                 </div>
 
-                {/* Tableau */}
                 {pool.standings.length === 0 ? (
                   <Card className="p-3 text-xs text-[var(--color-muted)] text-center">Pas encore de matchs joués</Card>
                 ) : (
@@ -223,7 +256,6 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
                     className="overflow-hidden divide-y divide-[var(--color-border-subtle)]"
                     style={{ borderColor: pool.color, borderWidth: "1.5px" }}
                   >
-                    {/* Entête colonnes */}
                     <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
                       <span>Équipe</span>
                       <span className="w-6 text-center">J</span>
@@ -263,42 +295,188 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
             ))}
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
 
-          {/* Bracket en bas si pas encore en phase bracket */}
-          {!hasBracketPhase && (
-            <Link href="/leaderboard/bracket">
-              <Card className="flex items-center justify-between p-3 hover:border-[var(--color-accent)]/30 transition-colors">
-                <div>
-                  <p className="text-sm font-semibold">Bracket double élimination</p>
-                  <p className="text-[10px] text-[var(--color-muted)]">Winners · Losers · Finale BO3</p>
-                </div>
-                <ChevronRight className="size-4 text-[var(--color-muted)]" />
-              </Card>
-            </Link>
-          )}
+/* ─── Bracket inline ─── */
 
-          {/* Finale BO3 */}
-          {finalSeries && (
-            <Card className="p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)] mb-3">Finale</p>
-              <div className="flex items-center justify-between">
-                <div className="text-center flex-1">
-                  <p className="text-sm font-bold">{finalSeries.matches[0]?.teamA?.name ?? "—"}</p>
-                  <p className="text-3xl font-bold text-[var(--color-accent)]">{finalSeries.teamAWins}</p>
-                </div>
-                <div className="px-4 text-center">
-                  <p className="text-xs font-bold text-[var(--color-muted)]">Best of 3</p>
-                  {finalSeries.winnerTeamId && (
-                    <p className="text-xs text-[var(--color-accent)] mt-1">Terminée !</p>
-                  )}
-                </div>
-                <div className="text-center flex-1">
-                  <p className="text-sm font-bold">{finalSeries.matches[0]?.teamB?.name ?? "—"}</p>
-                  <p className="text-3xl font-bold text-[var(--color-accent)]">{finalSeries.teamBWins}</p>
-                </div>
+const PHASE_COLOR: Record<string, string> = {
+  WINNER_BRACKET: "#22c55e",
+  LOSER_BRACKET: "#f97316",
+};
+
+function groupByRound(matches: BracketMatch[]) {
+  const map = new Map<number, BracketMatch[]>();
+  for (const m of matches) {
+    const r = m.round ?? 1;
+    if (!map.has(r)) map.set(r, []);
+    map.get(r)!.push(m);
+  }
+  return Array.from(map.entries()).sort(([a], [b]) => a - b);
+}
+
+function bracketStats(matches: BracketMatch[], teamId: string) {
+  let wins = 0, losses = 0;
+  for (const m of matches) {
+    if (m.status !== "FINISHED") continue;
+    if (m.teamAId === teamId) { m.result === "TEAM_A" ? wins++ : losses++; }
+    else if (m.teamBId === teamId) { m.result === "TEAM_B" ? wins++ : losses++; }
+  }
+  return { wins, losses };
+}
+
+function WLBadge({ wins, losses }: { wins: number; losses: number }) {
+  return (
+    <span className="shrink-0 flex items-center gap-0.5 text-[9px] font-semibold">
+      <span className={wins > 0 ? "text-green-400" : "text-[var(--color-muted)]"}>{wins}V</span>
+      <span className="text-[var(--color-muted)]">·</span>
+      <span className={losses > 0 ? "text-orange-400" : "text-[var(--color-muted)]"}>{losses}D</span>
+    </span>
+  );
+}
+
+function BracketMatchCard({ match, allMatches }: { match: BracketMatch; allMatches: BracketMatch[] }) {
+  const isFinished = match.status === "FINISHED";
+  const isLive = match.status === "LIVE";
+  const hasTBD = !match.teamBId;
+  const phaseColor = PHASE_COLOR[match.phase] ?? "#eab308";
+  const statusText = isFinished ? "Terminé" : isLive ? "LIVE" : "À venir";
+  const statusCls = isFinished ? "text-[var(--color-muted)]" : isLive ? "text-red-400" : "text-orange-400";
+
+  const statsA = bracketStats(allMatches, match.teamAId);
+  const statsB = match.teamBId ? bracketStats(allMatches, match.teamBId) : null;
+  const eliminatedA = statsA.losses >= 2;
+  const eliminatedB = statsB ? statsB.losses >= 2 : false;
+
+  return (
+    <Link href={`/matches/${match.id}`}>
+      <Card className="p-2.5 hover:border-[var(--color-accent)]/30 transition-colors min-w-[160px]">
+        <span className={`text-[10px] font-medium ${statusCls}`}>{statusText}</span>
+        <div className="mt-1 space-y-1">
+          <div className={`flex items-center justify-between gap-2 ${isFinished && match.result === "TEAM_A" ? "text-[var(--color-accent)]" : ""}`}>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <TeamLogo url={match.teamA?.logoUrl} name={match.teamA?.name ?? "?"} poolColor={phaseColor} className="size-4 rounded" />
+              <span className={cn("text-xs font-medium truncate", eliminatedA && "line-through text-red-400")}>
+                {match.teamA?.name ?? "?"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <WLBadge {...statsA} />
+              {isFinished && <span className="text-xs font-bold">{match.scoreA}</span>}
+            </div>
+          </div>
+          <div className={`flex items-center justify-between gap-2 ${isFinished && match.result === "TEAM_B" ? "text-[var(--color-accent)]" : ""}`}>
+            <div className="flex items-center gap-1.5 min-w-0">
+              {hasTBD ? (
+                <span className="text-[10px] italic text-[var(--color-muted)]">À déterminer…</span>
+              ) : (
+                <>
+                  <TeamLogo url={match.teamB?.logoUrl ?? null} name={match.teamB?.name ?? "?"} poolColor={phaseColor} className="size-4 rounded" />
+                  <span className={cn("text-xs font-medium truncate", eliminatedB && "line-through text-red-400")}>
+                    {match.teamB?.name}
+                  </span>
+                </>
+              )}
+            </div>
+            {!hasTBD && match.teamBId && statsB && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <WLBadge {...statsB} />
+                {isFinished && <span className="text-xs font-bold">{match.scoreB}</span>}
               </div>
-            </Card>
-          )}
+            )}
+          </div>
+        </div>
+      </Card>
+    </Link>
+  );
+}
+
+function BracketSection({ label, color, rounds, allMatches }: {
+  label: string;
+  color: string;
+  rounds: [number, BracketMatch[]][];
+  allMatches: BracketMatch[];
+}) {
+  if (rounds.length === 0) return null;
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-sm font-semibold" style={{ color }}>{label}</span>
+        <div className="h-px flex-1" style={{ background: `${color}40` }} />
+      </div>
+      <div className="overflow-x-auto -mx-1 px-1">
+        <div className="flex gap-3 pb-2" style={{ minWidth: `${rounds.length * 172}px` }}>
+          {rounds.map(([round, rMatches]) => (
+            <div key={round} className="flex-none w-40">
+              <p className="text-[10px] uppercase tracking-wider text-[var(--color-muted)] mb-2 text-center">
+                Tour {round}
+              </p>
+              <div className="space-y-2">
+                {rMatches.map((m) => (
+                  <BracketMatchCard key={m.id} match={m} allMatches={allMatches} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BracketInline({ matches, finalSeries }: { matches: BracketMatch[]; finalSeries: FinalSeries | null }) {
+  const wb = matches.filter((m) => m.phase === "WINNER_BRACKET");
+  const lb = matches.filter((m) => m.phase === "LOSER_BRACKET");
+  const wbRounds = groupByRound(wb);
+  const lbRounds = groupByRound(lb);
+
+  return (
+    <div className="space-y-5">
+      {/* Header avec lien détail */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold">Bracket double élimination</p>
+          <p className="text-[10px] text-[var(--color-muted)]">Winners · Losers · Finale BO3</p>
+        </div>
+        <Link
+          href="/leaderboard/bracket"
+          className="flex items-center gap-1 text-[10px] text-[var(--color-muted)] hover:text-[var(--color-cream)] transition-colors"
+        >
+          Détails <ChevronRight className="size-3" />
+        </Link>
+      </div>
+
+      <BracketSection label="🏆 Winners Bracket" color="#22c55e" rounds={wbRounds} allMatches={matches} />
+      <BracketSection label="🔻 Losers Bracket" color="#f97316" rounds={lbRounds} allMatches={matches} />
+
+      {/* Finale BO3 */}
+      {finalSeries && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm font-semibold" style={{ color: "#eab308" }}>🎯 Finale (Best of 3)</span>
+            <div className="h-px flex-1" style={{ background: "#eab30840" }} />
+          </div>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="text-center flex-1">
+                <p className="text-sm font-bold">{finalSeries.matches[0]?.teamA?.name ?? "—"}</p>
+                <p className="text-3xl font-bold text-[var(--color-accent)]">{finalSeries.teamAWins}</p>
+              </div>
+              <div className="px-4 text-center">
+                <p className="text-xs font-bold text-[var(--color-muted)]">Best of 3</p>
+                {finalSeries.winnerTeamId && (
+                  <p className="text-xs text-[var(--color-accent)] mt-1">Terminée !</p>
+                )}
+              </div>
+              <div className="text-center flex-1">
+                <p className="text-sm font-bold">{finalSeries.matches[0]?.teamB?.name ?? "—"}</p>
+                <p className="text-3xl font-bold text-[var(--color-accent)]">{finalSeries.teamBWins}</p>
+              </div>
+            </div>
+          </Card>
         </div>
       )}
     </div>

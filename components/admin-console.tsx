@@ -1410,6 +1410,37 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
             )}
           </Card>
 
+          {/* Générer le tour suivant */}
+          {bracketExists && (() => {
+            const pendingBracket = matches.some(
+              (m) => ["WINNER_BRACKET", "LOSER_BRACKET"].includes(m.phase) && ["SCHEDULED", "LIVE"].includes(m.status)
+            );
+            const finishedBracket = matches.some(
+              (m) => ["WINNER_BRACKET", "LOSER_BRACKET"].includes(m.phase) && m.status === "FINISHED"
+            );
+            const hasFinal = matches.some((m) => m.phase === "FINAL_SERIES");
+            if (!finishedBracket || hasFinal) return null;
+            return (
+              <Card className="p-4 space-y-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)] flex items-center gap-2">
+                  <Shuffle className="size-3.5" /> Tour suivant
+                </h4>
+                <p className="text-[11px] text-[var(--color-muted)] leading-relaxed">
+                  {pendingBracket
+                    ? "Des matchs sont encore en cours. Saisissez tous les résultats avant de générer le tour suivant."
+                    : "Tous les matchs du tour sont terminés. Le système va créer les matchs suivants automatiquement (bye si nombre impair)."}
+                </p>
+                <Button
+                  onClick={handleNextRound}
+                  disabled={pendingBracket || nextRoundLoading}
+                  className="w-full font-bold disabled:opacity-40"
+                >
+                  {nextRoundLoading ? "Génération…" : "⚡ Générer le tour suivant"}
+                </Button>
+              </Card>
+            );
+          })()}
+
           {/* Bracket existant résumé */}
           {bracketExists && (
             <Card className="p-4 space-y-3">
@@ -1443,37 +1474,6 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
               })}
             </Card>
           )}
-
-          {/* Générer le tour suivant */}
-          {bracketExists && (() => {
-            const pendingBracket = matches.some(
-              (m) => ["WINNER_BRACKET", "LOSER_BRACKET"].includes(m.phase) && ["SCHEDULED", "LIVE"].includes(m.status)
-            );
-            const finishedBracket = matches.some(
-              (m) => ["WINNER_BRACKET", "LOSER_BRACKET"].includes(m.phase) && m.status === "FINISHED"
-            );
-            const hasFinal = matches.some((m) => m.phase === "FINAL_SERIES");
-            if (!finishedBracket || hasFinal) return null;
-            return (
-              <Card className="p-4 space-y-3">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)] flex items-center gap-2">
-                  <Shuffle className="size-3.5" /> Tour suivant
-                </h4>
-                <p className="text-[11px] text-[var(--color-muted)] leading-relaxed">
-                  {pendingBracket
-                    ? "Des matchs sont encore en cours. Saisissez tous les résultats avant de générer le tour suivant."
-                    : "Tous les matchs du tour sont terminés. Le système va créer les matchs suivants automatiquement (bye si nombre impair)."}
-                </p>
-                <Button
-                  onClick={handleNextRound}
-                  disabled={pendingBracket || nextRoundLoading}
-                  className="w-full font-bold disabled:opacity-40"
-                >
-                  {nextRoundLoading ? "Génération…" : "⚡ Générer le tour suivant"}
-                </Button>
-              </Card>
-            );
-          })()}
         </div>
       )}
 

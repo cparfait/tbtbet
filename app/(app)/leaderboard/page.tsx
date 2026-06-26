@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { getLeaderboard, getAllPoolsStandings, getFinalSeries, hasBracketMatches } from "@/lib/data/queries";
+import { prisma } from "@/lib/prisma";
 import { LeaderboardClient } from "./leaderboard-client";
 
 export const metadata = { title: "Classement · TBT Bet" };
@@ -18,6 +19,14 @@ export default async function LeaderboardPage() {
     hasBracketMatches(),
   ]);
 
+  const bracketMatches = bracketPhase
+    ? await prisma.match.findMany({
+        where: { phase: { in: ["WINNER_BRACKET", "LOSER_BRACKET"] } },
+        include: { teamA: true, teamB: true },
+        orderBy: [{ round: "asc" }, { scheduledAt: "asc" }],
+      })
+    : [];
+
   return (
     <div className="space-y-5">
       <PageHeader title="Classement" subtitle="Parieurs · Poules · Finale" />
@@ -27,6 +36,7 @@ export default async function LeaderboardPage() {
         finalSeries={finalSeries}
         currentUserId={session.user.id}
         hasBracketPhase={bracketPhase}
+        bracketMatches={bracketMatches}
       />
     </div>
   );
