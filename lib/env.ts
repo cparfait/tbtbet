@@ -4,7 +4,9 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL est requis"),
   DIRECT_URL: z.string().min(1, "DIRECT_URL est requis"),
   AUTH_SECRET: z.string().min(16, "AUTH_SECRET doit faire au moins 16 caractères"),
-  AUTH_URL: z.string().url("AUTH_URL doit être une URL valide"),
+  // NextAuth accepte AUTH_URL ou NEXTAUTH_URL selon la version
+  AUTH_URL: z.string().url().optional(),
+  NEXTAUTH_URL: z.string().url().optional(),
   // Optionnels
   AUTH_GOOGLE_ID: z.string().optional(),
   AUTH_GOOGLE_SECRET: z.string().optional(),
