@@ -55,4 +55,4 @@ COPY package.json package-lock.json* ./
 COPY prisma ./prisma
 RUN npm ci --ignore-scripts
 
-CMD ["node", "node_modules/prisma/build/index.js", "db", "push", "--skip-generate"]
+CMD ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]

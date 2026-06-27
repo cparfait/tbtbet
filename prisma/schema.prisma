@@ -130,6 +130,8 @@ model Match {
 
   @@index([status])
   @@index([scheduledAt])
+  @@index([phase, round])
+  @@index([status, scheduledAt])
 }
 
 // Série finale en BO3 : regroupe 2 ou 3 matchs liés
@@ -163,6 +165,7 @@ model Bet {
 
   @@unique([userId, matchId])
   @@index([matchId])
+  @@index([userId, settled])
 }
 
 model ChampionBet {

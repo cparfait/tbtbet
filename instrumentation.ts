@@ -5,6 +5,9 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
+  // Valide les variables d'environnement critiques au démarrage.
+  await import("./lib/env");
+
   const { maybeInit } = await import("./lib/init");
 
   setTimeout(() => {
