@@ -516,3 +516,16 @@ export async function getPlayerComparison(currentUserId: string, targetUserId: s
 
   return { currentUser, targetUser, matches };
 }
+
+// ─────────────────────────────────────────────
+// Paramètres globaux
+// ─────────────────────────────────────────────
+
+export async function getSiteSetting(key: string): Promise<string | null> {
+  try {
+    const s = await prisma.siteSetting.findUnique({ where: { key } });
+    return s?.value ?? null;
+  } catch {
+    return null;
+  }
+}

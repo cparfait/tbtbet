@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Trophy, User, ShieldCheck } from "lucide-react";
+import { Home, Trophy, User, ShieldCheck, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BASE_ITEMS = [
@@ -11,11 +11,16 @@ const BASE_ITEMS = [
   { href: "/profile", label: "Profil", icon: User },
 ] as const;
 
+const CHAT_ITEM = { href: "/chat", label: "Chat", icon: MessageCircle } as const;
 const ADMIN_ITEM = { href: "/admin", label: "Admin", icon: ShieldCheck } as const;
 
-export function BottomNav({ isAdmin = false }: { isAdmin?: boolean }) {
+export function BottomNav({ isAdmin = false, chatEnabled = false }: { isAdmin?: boolean; chatEnabled?: boolean }) {
   const pathname = usePathname();
-  const items = isAdmin ? [...BASE_ITEMS, ADMIN_ITEM] : BASE_ITEMS;
+  const items = [
+    ...BASE_ITEMS,
+    ...(chatEnabled ? [CHAT_ITEM] : []),
+    ...(isAdmin ? [ADMIN_ITEM] : []),
+  ];
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 pb-[env(safe-area-inset-bottom)]">

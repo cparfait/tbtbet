@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn, dayKey, dayLabel, formatKickoffTime } from "@/lib/utils";
 import { TeamLogo } from "@/components/team-logo";
-import { Users, Swords, Trophy, Plus, Trash2, CheckCircle2, Calendar, RefreshCw, ImageIcon, Upload, Wrench, RotateCcw, Sparkles, Zap, TrendingUp, Shuffle } from "lucide-react";
+import { Users, Swords, Trophy, Plus, Trash2, CheckCircle2, Calendar, RefreshCw, ImageIcon, Upload, Wrench, RotateCcw, Sparkles, Zap, TrendingUp, Shuffle, MessageCircle } from "lucide-react";
 import { TirageOverlay, type TiragePayload } from "@/components/tirage-overlay";
 
 // ── Types ──
@@ -432,6 +432,34 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
       ok(`Scénario « ${phase} » chargé (10 joueurs, paris posés).`);
     } catch (e) { err(e); }
     finally { setTestLoading(null); }
+  }
+
+  // ── Chat toggle ──
+  const [chatEnabled, setChatEnabled] = useState<boolean | null>(null);
+  const [chatLoading, setChatLoading] = useState(false);
+
+  // Charger l'état du chat au montage
+  useEffect(() => {
+    fetch("/api/admin/settings")
+      .then((r) => r.json())
+      .then((data: Record<string, string>) => {
+        setChatEnabled(data["chat_enabled"] === "true");
+      })
+      .catch(() => setChatEnabled(false));
+  }, []);
+
+  async function handleToggleChat() {
+    if (chatEnabled === null) return;
+    setChatLoading(true);
+    try {
+      await apiCall("/api/admin/settings", "PATCH", {
+        key: "chat_enabled",
+        value: chatEnabled ? "false" : "true",
+      });
+      setChatEnabled(!chatEnabled);
+      ok(chatEnabled ? "Chat désactivé." : "Chat activé !");
+    } catch (e) { err(e); }
+    finally { setChatLoading(false); }
   }
 
   // ── Tools ──
@@ -1646,6 +1674,38 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
 
       {tab === "tools" && (
         <div className="space-y-4">
+          {/* Chat */}
+          <Card className="p-4 space-y-3 border border-[var(--color-border-subtle)]">
+            <div className="flex items-start gap-3">
+              <MessageCircle className="size-5 text-[var(--color-accent)] shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold">Chat général</h3>
+                <p className="text-xs text-[var(--color-muted)] mt-0.5">
+                  Affiche ou masque le lien Chat dans la navigation des joueurs.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={handleToggleChat}
+              disabled={chatLoading || chatEnabled === null}
+              className={cn(
+                "w-full text-xs font-semibold",
+                chatEnabled
+                  ? "bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30"
+                  : "bg-[var(--color-accent)]/10 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20 border border-[var(--color-accent)]/30"
+              )}
+            >
+              <MessageCircle className="size-3.5 mr-1" />
+              {chatLoading
+                ? "En cours…"
+                : chatEnabled === null
+                ? "Chargement…"
+                : chatEnabled
+                ? "Désactiver le chat"
+                : "Activer le chat"}
+            </Button>
+          </Card>
+
           {/* Reset */}
           <Card className="p-4 space-y-3 border border-red-500/20">
             <div className="flex items-start gap-3">

@@ -4,7 +4,7 @@ import { maybeInit } from "@/lib/init";
 import { BottomNav } from "@/components/bottom-nav";
 import { WelcomeModal } from "@/components/welcome-modal";
 import { TiragePoller } from "@/components/tirage-poller";
-import { getUserById } from "@/lib/data/queries";
+import { getUserById, getSiteSetting } from "@/lib/data/queries";
 
 export default async function AppLayout({
   children,
@@ -16,7 +16,11 @@ export default async function AppLayout({
 
   maybeInit().catch(() => {});
 
-  const user = await getUserById(session.user.id);
+  const [user, chatEnabledRaw] = await Promise.all([
+    getUserById(session.user.id),
+    getSiteSetting("chat_enabled"),
+  ]);
+  const chatEnabled = chatEnabledRaw === "true";
   // JWT valide mais user supprimé en base (ex: rechargement de scénario)
   if (!user) redirect("/api/auth/force-signout");
 
@@ -27,7 +31,7 @@ export default async function AppLayout({
       <main className="page-enter flex-1 px-4 pb-24 pt-4">
         {children}
       </main>
-      <BottomNav isAdmin={user?.role === "ADMIN"} />
+      <BottomNav isAdmin={user?.role === "ADMIN"} chatEnabled={chatEnabled} />
       {showWelcome && <WelcomeModal initialName={user.name ?? ""} />}
       <TiragePoller isAdmin={user?.role === "ADMIN"} />
     </div>

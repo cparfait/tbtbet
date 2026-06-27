@@ -273,6 +273,16 @@ model TirageEvent {
 }
 
 // ─────────────────────────────────────────────
+// Paramètres globaux de l'app
+// ─────────────────────────────────────────────
+
+model SiteSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
 // Enums
 // ─────────────────────────────────────────────
 
