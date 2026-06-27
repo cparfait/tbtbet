@@ -95,6 +95,7 @@ export function ChampionPickModal({ teams }: { teams: Team[] }) {
         <Button
           onClick={handleConfirm}
           disabled={!selected || submitting}
+          variant="gold"
           className="w-full"
         >
           {submitting ? "Enregistrement…" : selected ? "Confirmer mon choix" : "Sélectionne une équipe"}
