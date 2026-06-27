@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { TeamLogo } from "@/components/team-logo";
 import { X } from "lucide-react";
@@ -31,25 +31,43 @@ interface TirageOverlayProps {
   onClose: () => void;
 }
 
-// Chaque step révèle UNE équipe ou un header — avancé par clic admin
+// Calcule les seuils de step dynamiquement depuis le payload.
 // step 0  → état initial (rien de visible)
 // step 1  → titre
-// step 2  → header WB
-// step 3  → WB M1 teamA   (la carte WB M1 apparaît avec teamB = ???)
-// step 4  → WB M1 teamB
-// step 5  → WB M2 teamA
-// step 6  → WB M2 teamB
-// step 7  → WB M3 teamA
-// step 8  → WB M3 teamB
-// step 9  → header LB
-// step 10 → LB M1 teamA
-// step 11 → LB M1 teamB
-// step 12 → LB M2 teamA
-// step 13 → LB M2 teamB
-// step 14 → bouton fermer (fin)
-const MAX_STEP = 14;
+// step 2  → header WB  (si wbPairs.length > 0, sinon header LB)
+// steps 3..2+2*wbN  → WB pairs (2 steps par paire : teamA puis teamB)
+// step 3+2*wbN      → header LB  (si lbPairs.length > 0)
+// steps 4+2*wbN..   → LB pairs (2 steps par paire)
+// MAX_STEP           → bouton fermer
+function computeSteps(payload: TiragePayload) {
+  const wbN = payload.wbPairs.length;
+  const lbN = payload.lbPairs.length;
+
+  const hasWB = wbN > 0;
+  const hasLB = lbN > 0;
+
+  // WB
+  const WB_HEADER = hasWB ? 2 : -1;
+  const WB_PAIR_BASE = hasWB ? 3 : 0; // cardStep = WB_PAIR_BASE + i*2
+
+  // LB header vient juste après toutes les paires WB
+  const LB_HEADER = hasLB ? (hasWB ? 3 + wbN * 2 : 2) : -1;
+
+  // LB pairs commencent après le header LB (ou après WB si pas de LB header)
+  const LB_PAIR_BASE = hasLB ? LB_HEADER + 1 : 0;
+
+  // Dernier step = bouton fermer
+  let MAX_STEP = 1; // au minimum le titre
+  if (hasWB) MAX_STEP = WB_PAIR_BASE + wbN * 2;
+  if (hasLB) MAX_STEP = LB_PAIR_BASE + lbN * 2;
+
+  return { WB_HEADER, WB_PAIR_BASE, LB_HEADER, LB_PAIR_BASE, MAX_STEP };
+}
 
 export function TirageOverlay({ payload, isAdmin, externalStep, onStepChange, onClose }: TirageOverlayProps) {
+  const steps = useMemo(() => computeSteps(payload), [payload]);
+  const { WB_HEADER, WB_PAIR_BASE, LB_HEADER, LB_PAIR_BASE, MAX_STEP } = steps;
+
   const [localStep, setLocalStep] = useState(0);
 
   // En mode viewer, le step est piloté par l'admin via externalStep
@@ -94,44 +112,48 @@ export function TirageOverlay({ payload, isAdmin, externalStep, onStepChange, on
 
       <div className="w-full max-w-sm space-y-6">
         {/* Winner Bracket */}
-        <section>
-          <SectionHeader label="Winner Bracket" color="#F5C400" visible={step >= 2} />
-          <div className="space-y-2.5 mt-3">
-            {payload.wbPairs.map((pair, i) => {
-              const cardStep = 3 + i * 2;
-              return (
-                <PairCard
-                  key={pair.label}
-                  pair={pair}
-                  color="#F5C400"
-                  cardVisible={step >= cardStep}
-                  teamAVisible={step >= cardStep}
-                  teamBVisible={step >= cardStep + 1}
-                />
-              );
-            })}
-          </div>
-        </section>
+        {payload.wbPairs.length > 0 && (
+          <section>
+            <SectionHeader label="Winner Bracket" color="#F5C400" visible={step >= WB_HEADER} />
+            <div className="space-y-2.5 mt-3">
+              {payload.wbPairs.map((pair, i) => {
+                const cardStep = WB_PAIR_BASE + i * 2;
+                return (
+                  <PairCard
+                    key={pair.label}
+                    pair={pair}
+                    color="#F5C400"
+                    cardVisible={step >= cardStep}
+                    teamAVisible={step >= cardStep}
+                    teamBVisible={step >= cardStep + 1}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Loser Bracket */}
-        <section>
-          <SectionHeader label="Loser Bracket" color="#F97316" visible={step >= 9} />
-          <div className="space-y-2.5 mt-3">
-            {payload.lbPairs.map((pair, i) => {
-              const cardStep = 10 + i * 2;
-              return (
-                <PairCard
-                  key={pair.label}
-                  pair={pair}
-                  color="#F97316"
-                  cardVisible={step >= cardStep}
-                  teamAVisible={step >= cardStep}
-                  teamBVisible={step >= cardStep + 1}
-                />
-              );
-            })}
-          </div>
-        </section>
+        {payload.lbPairs.length > 0 && (
+          <section>
+            <SectionHeader label="Loser Bracket" color="#F97316" visible={step >= LB_HEADER} />
+            <div className="space-y-2.5 mt-3">
+              {payload.lbPairs.map((pair, i) => {
+                const cardStep = LB_PAIR_BASE + i * 2;
+                return (
+                  <PairCard
+                    key={pair.label}
+                    pair={pair}
+                    color="#F97316"
+                    cardVisible={step >= cardStep}
+                    teamAVisible={step >= cardStep}
+                    teamBVisible={step >= cardStep + 1}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        )}
       </div>
 
       {/* Indicateur — admin : cliquer pour révéler / viewer : en attente */}
@@ -250,15 +272,17 @@ function TeamSlot({
         >
           {visible ? team.name : "???"}
         </p>
-        <p
-          className={cn(
-            "text-[10px] font-semibold mt-0.5 transition-all duration-400",
-            visible ? "opacity-100" : "opacity-0"
-          )}
-          style={{ color }}
-        >
-          {visible ? team.seed : "—"}
-        </p>
+        {team.seed && (
+          <p
+            className={cn(
+              "text-[10px] font-semibold mt-0.5 transition-all duration-400",
+              visible ? "opacity-100" : "opacity-0"
+            )}
+            style={{ color }}
+          >
+            {visible ? team.seed : "—"}
+          </p>
+        )}
       </div>
     </div>
   );

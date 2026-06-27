@@ -389,11 +389,19 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
     try {
       const data = await apiCall("/api/admin/tirage/next-round", "POST") as {
         wbCreated: number; lbCreated: number; grandFinal: boolean; byes: string[];
+        payload?: TiragePayload; eventId?: string;
       };
-      const msg = data.grandFinal
-        ? "Finale BO3 générée !"
-        : `Tour suivant généré : ${data.wbCreated} match(s) WB, ${data.lbCreated} match(s) LB.${data.byes.length ? ` (${data.byes.length} bye${data.byes.length > 1 ? "s" : ""})` : ""}`;
-      ok(msg);
+      if (data.grandFinal) {
+        ok("Finale BO3 générée !");
+      } else if (data.payload && data.eventId) {
+        // Ouvre l'overlay de tirage comme pour le R1
+        setTiragePayload(data.payload);
+        setTirageEventId(data.eventId);
+        router.refresh();
+      } else {
+        const msg = `Tour suivant généré : ${data.wbCreated} match(s) WB, ${data.lbCreated} match(s) LB.${data.byes.length ? ` (${data.byes.length} bye${data.byes.length > 1 ? "s" : ""})` : ""}`;
+        ok(msg);
+      }
     } catch (e) { err(e); }
     finally { setNextRoundLoading(false); }
   }
