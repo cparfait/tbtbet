@@ -109,6 +109,7 @@ export default async function DashboardPage() {
   ];
 
   const firstName = user.name?.split(" ")[0] ?? "Joueur";
+  const betMatchIds = new Set(bets.filter((b) => !b.settled).map((b) => b.matchId));
 
   return (
     <div className="space-y-5 pt-1">
@@ -268,7 +269,7 @@ export default async function DashboardPage() {
                           </div>
                         ) : (
                           <div className="mt-4 flex items-center justify-center gap-1 rounded-lg bg-[var(--color-accent)]/10 py-2 text-sm font-medium text-[var(--color-accent)]">
-                            Parier sur ce match
+                            {betMatchIds.has(match.id) ? "Modifier mon pari" : "Parier sur ce match"}
                             <ChevronRight className="size-4" />
                           </div>
                         )}
