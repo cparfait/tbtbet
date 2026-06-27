@@ -12,7 +12,8 @@ export const authConfig = {
   session: { strategy: "jwt" },
   callbacks: {
     /** Protège les routes : seules les pages publiques sont accessibles sans session. */
-    authorized({ auth, request: { nextUrl } }) {
+    authorized({ auth, request }) {
+      const { nextUrl } = request;
       const isLoggedIn = !!auth?.user;
       const publicPaths = ["/", "/login", "/register"];
       const isPublic =
@@ -26,10 +27,12 @@ export const authConfig = {
       if (isPublic) return true;
       if (isLoggedIn) return true;
 
-      // Redirige vers /login en utilisant AUTH_URL pour éviter que Docker
-      // construise l'URL depuis le host interne (0.0.0.0:3000).
-      const base = process.env.AUTH_URL ?? nextUrl.origin;
-      const loginUrl = new URL("/login", base);
+      // Reverse proxy (NPM/Traefik) fournit les headers forwarded.
+      // Le edge runtime ne peut pas lire les env vars Docker au runtime,
+      // donc on reconstruit l'origine publique depuis ces headers.
+      const proto = request.headers.get("x-forwarded-proto") ?? nextUrl.protocol.replace(":", "");
+      const host  = request.headers.get("x-forwarded-host")  ?? nextUrl.host;
+      const loginUrl = new URL("/login", `${proto}://${host}`);
       loginUrl.searchParams.set("next", nextUrl.pathname);
       return Response.redirect(loginUrl);
     },
