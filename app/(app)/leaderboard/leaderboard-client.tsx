@@ -61,11 +61,22 @@ interface PoolStandings {
   standings: TeamStanding[];
 }
 
+interface FinalMatch {
+  id: string;
+  status: string;
+  result: string | null;
+  scoreA: number | null;
+  scoreB: number | null;
+  scheduledAt: string | Date | null;
+  teamA: { name: string; logoUrl?: string | null };
+  teamB: { name: string; logoUrl?: string | null } | null;
+}
+
 interface FinalSeries {
   teamAWins: number;
   teamBWins: number;
   winnerTeamId: string | null;
-  matches: { teamA: { name: string } | null; teamB: { name: string } | null }[];
+  matches: FinalMatch[];
 }
 
 interface Props {
@@ -86,6 +97,9 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
 
   return (
     <div className="space-y-5">
+
+      {/* ── Bloc Finale (toujours visible si finale active) ── */}
+      {finalSeries && <FinaleBlock finalSeries={finalSeries} />}
 
       {/* ── Toggle ── */}
       <div className="flex rounded-xl bg-[var(--color-surface-2)] p-1 gap-1">
@@ -297,6 +311,93 @@ export function LeaderboardClient({ leaderboard, poolStandings, finalSeries, cur
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─── Bloc Finale ─── */
+
+function FinaleBlock({ finalSeries }: { finalSeries: FinalSeries }) {
+  const teamAName = finalSeries.matches[0]?.teamA?.name ?? "—";
+  const teamBName = finalSeries.matches[0]?.teamB?.name ?? "—";
+  const teamALogo = finalSeries.matches[0]?.teamA?.logoUrl ?? null;
+  const teamBLogo = finalSeries.matches[0]?.teamB?.logoUrl ?? null;
+  const isOver = !!finalSeries.winnerTeamId;
+
+  const statusLabel = (m: FinalMatch) => {
+    if (m.status === "FINISHED") return { text: "Terminé", cls: "text-[var(--color-muted)]" };
+    if (m.status === "LIVE") return { text: "LIVE", cls: "text-red-400 animate-pulse" };
+    return { text: "À venir", cls: "text-orange-400" };
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#eab308" }}>🎯 Finale — Best of 3</span>
+        <div className="h-px flex-1" style={{ background: "#eab30840" }} />
+        {isOver && <span className="text-[10px] font-semibold text-[var(--color-accent)]">Terminée</span>}
+      </div>
+
+      <Card className="overflow-hidden border-[var(--color-accent)]/30" style={{ background: "linear-gradient(135deg, rgba(234,179,8,0.06) 0%, transparent 60%)" }}>
+        {/* Score de série */}
+        <div className="flex items-center justify-between px-5 py-4">
+          <div className="flex flex-col items-center gap-1.5 flex-1">
+            <TeamLogo url={teamALogo} name={teamAName} className="size-12 rounded-xl" />
+            <p className="text-xs font-bold text-center truncate max-w-[80px]">{teamAName}</p>
+            <p className="text-4xl font-black text-[var(--color-accent)]">{finalSeries.teamAWins}</p>
+          </div>
+          <div className="flex flex-col items-center gap-1 px-3 shrink-0">
+            <p className="text-[10px] text-[var(--color-muted)] font-semibold uppercase tracking-wider">BO3</p>
+            <p className="text-lg font-black text-[var(--color-muted)]">–</p>
+          </div>
+          <div className="flex flex-col items-center gap-1.5 flex-1">
+            <TeamLogo url={teamBLogo} name={teamBName} className="size-12 rounded-xl" />
+            <p className="text-xs font-bold text-center truncate max-w-[80px]">{teamBName}</p>
+            <p className="text-4xl font-black text-[var(--color-accent)]">{finalSeries.teamBWins}</p>
+          </div>
+        </div>
+
+        {/* Détail des matchs */}
+        {finalSeries.matches.length > 0 && (
+          <div className="border-t border-[var(--color-border-subtle)] divide-y divide-[var(--color-border-subtle)]">
+            {finalSeries.matches.map((m, idx) => {
+              const { text, cls } = statusLabel(m);
+              return (
+                <Link key={m.id} href={`/matches/${m.id}`}>
+                  <div className="flex items-center justify-between px-4 py-2.5 hover:bg-[var(--color-surface-2)] transition-colors">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="text-[10px] text-[var(--color-muted)] shrink-0">M{idx + 1}</span>
+                      <span className={cn("text-xs font-semibold truncate", m.result === "TEAM_A" ? "text-[var(--color-accent)]" : "")}>
+                        {m.teamA.name}
+                      </span>
+                    </div>
+                    <div className="px-3 text-center shrink-0">
+                      {m.status === "FINISHED" ? (
+                        <span className="text-xs font-bold">{m.scoreA} – {m.scoreB}</span>
+                      ) : (
+                        <span className={`text-[10px] font-semibold ${cls}`}>{text}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+                      <span className={cn("text-xs font-semibold truncate", m.result === "TEAM_B" ? "text-[var(--color-accent)]" : "")}>
+                        {m.teamB?.name ?? "?"}
+                      </span>
+                      <ChevronRight className="size-3 text-[var(--color-muted)] shrink-0" />
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+            {/* Match 3 en attente si 1-1 et M2 terminé */}
+            {finalSeries.teamAWins === 1 && finalSeries.teamBWins === 1 &&
+              finalSeries.matches.every((m) => m.status === "FINISHED") && (
+              <div className="flex items-center justify-center px-4 py-2.5 gap-2">
+                <span className="text-[10px] text-orange-400 font-semibold">Match 3 — en attente de génération</span>
+              </div>
+            )}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

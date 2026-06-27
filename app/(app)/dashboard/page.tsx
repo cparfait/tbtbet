@@ -74,19 +74,18 @@ export default async function DashboardPage() {
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
   const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
-  const todayMatches = matches.filter((m) => {
-    if (!m.scheduledAt) return false;
-    const d = new Date(m.scheduledAt);
+  const datedMatches = matches.filter((m) => !!m.scheduledAt);
+  const undatedMatches = matches.filter((m) => !m.scheduledAt);
+
+  const todayMatches = datedMatches.filter((m) => {
+    const d = new Date(m.scheduledAt!);
     return d >= todayStart && d <= todayEnd;
   });
 
-  const futureMatches = matches.filter((m) => {
-    if (!m.scheduledAt) return false;
-    return new Date(m.scheduledAt) > todayEnd;
-  });
+  const futureMatches = datedMatches.filter((m) => new Date(m.scheduledAt!) > todayEnd);
 
   // Si aucun match aujourd'hui, on affiche le prochain jour non grisé
-  const upcomingMatches = (() => {
+  const upcomingDatedMatches = (() => {
     if (todayMatches.length > 0 || futureMatches.length === 0) return [];
     const firstDate = new Date(futureMatches[0]!.scheduledAt!);
     const dayStart = new Date(firstDate.getFullYear(), firstDate.getMonth(), firstDate.getDate());
@@ -97,10 +96,17 @@ export default async function DashboardPage() {
     });
   })();
 
-  // Les matchs grisés = futureMatches moins ceux déjà affichés non-grisés
-  const grayedMatches = todayMatches.length > 0
-    ? futureMatches
-    : futureMatches.slice(upcomingMatches.length);
+  // Matchs mis en avant (non grisés)
+  const hasPrimary = todayMatches.length > 0 || upcomingDatedMatches.length > 0;
+  const upcomingMatches = hasPrimary
+    ? (todayMatches.length > 0 ? todayMatches : upcomingDatedMatches)
+    : undatedMatches.slice(0, 1); // premier match sans date si rien d'autre
+
+  // Matchs grisés
+  const grayedMatches = [
+    ...(todayMatches.length > 0 ? futureMatches : futureMatches.slice(upcomingDatedMatches.length)),
+    ...(hasPrimary ? undatedMatches : undatedMatches.slice(1)),
+  ];
 
   const firstName = user.name?.split(" ")[0] ?? "Joueur";
 
@@ -202,7 +208,7 @@ export default async function DashboardPage() {
       ) : (
         <>
           {/* Matchs du jour */}
-          {(todayMatches.length > 0 || upcomingMatches.length > 0) && (
+          {upcomingMatches.length > 0 && (
             <div>
               <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
                 {todayMatches.length > 0
@@ -212,7 +218,7 @@ export default async function DashboardPage() {
                     : "Prochain match"}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {(todayMatches.length > 0 ? todayMatches : upcomingMatches).map((match) => {
+                {upcomingMatches.map((match) => {
                   const oddsA = getOddsForTeam(match.teamA.elo, match.teamB?.elo ?? DEFAULT_ELO);
                   const oddsB = getOddsForTeam(match.teamB?.elo ?? DEFAULT_ELO, match.teamA.elo);
                   const playersA = teamPlayers(match.teamA);
@@ -275,7 +281,7 @@ export default async function DashboardPage() {
           )}
 
           {/* Aucun match */}
-          {todayMatches.length === 0 && upcomingMatches.length === 0 && grayedMatches.length === 0 && (
+          {upcomingMatches.length === 0 && grayedMatches.length === 0 && (
             <Card className="p-6 text-center">
               <Clock className="size-8 mx-auto mb-2 text-[var(--color-muted)]" />
               <p className="text-sm text-[var(--color-muted)]">Aucun match à venir.</p>
@@ -309,7 +315,7 @@ export default async function DashboardPage() {
                         </div>
                         <div className="text-center shrink-0 w-16">
                           <p className="text-sm font-bold text-[var(--color-muted)]">VS</p>
-                          {match.scheduledAt && (
+                          {match.scheduledAt ? (
                             <p className="text-[9px] text-[var(--color-muted)] mt-1 leading-tight">
                               {new Date(match.scheduledAt).toLocaleDateString("fr-FR", {
                                 weekday: "short", day: "numeric", month: "short",
@@ -317,6 +323,8 @@ export default async function DashboardPage() {
                               <br />
                               {new Date(match.scheduledAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                             </p>
+                          ) : (
+                            <p className="text-[9px] text-[var(--color-muted)] mt-1 leading-tight">Date à<br />confirmer</p>
                           )}
                         </div>
                         <div className="flex-1 text-center">

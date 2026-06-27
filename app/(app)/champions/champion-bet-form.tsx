@@ -81,13 +81,14 @@ export function ChampionBetForm({ teams }: ChampionBetFormProps) {
         <div className="flex gap-2">
           <button
             onClick={() => setConfirming(false)}
-            className="flex-1 rounded-xl border border-[var(--color-border-subtle)] py-3 text-sm text-[var(--color-muted)] hover:text-[var(--color-cream)]"
+            className="flex-1 rounded-xl border border-[var(--color-accent)]/30 py-3 text-sm text-[var(--color-muted)] transition-all hover:border-[var(--color-accent)] hover:text-[var(--color-cream)]"
           >
             Annuler
           </button>
           <Button
             onClick={handleConfirm}
             disabled={submitting}
+            variant="gold"
             className="flex-1 py-3 text-sm"
           >
             {submitting ? "Envoi…" : "Confirmer définitivement"}
@@ -115,7 +116,7 @@ export function ChampionBetForm({ teams }: ChampionBetFormProps) {
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 
-      <Button onClick={handleValidate} disabled={!teamId} className="w-full">
+      <Button onClick={handleValidate} disabled={!teamId} variant="gold" className="w-full">
         Choisir cette équipe
       </Button>
     </div>

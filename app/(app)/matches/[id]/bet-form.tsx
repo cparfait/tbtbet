@@ -118,8 +118,8 @@ export function BetForm({
               className={cn(
                 "flex flex-col items-center gap-1.5 rounded-xl border-2 py-2.5 text-center transition-all",
                 active
-                  ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10"
-                  : "border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] hover:border-[var(--color-accent)]/40"
+                  ? "border-[var(--color-accent)] bg-[var(--color-accent)]/15 shadow-[0_0_0_1px_var(--color-accent)]"
+                  : "border-[var(--color-accent)]/30 bg-[var(--color-surface-2)] hover:border-[var(--color-accent)] hover:bg-[var(--color-accent)]/10"
               )}
             >
               {logo ? (
@@ -176,8 +176,8 @@ export function BetForm({
           className={cn(
             "w-full flex items-center justify-between rounded-xl border-2 px-3 py-2 transition-all",
             jokerUsed
-              ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10"
-              : "border-[var(--color-border-subtle)] bg-[var(--color-surface-2)]"
+              ? "border-[var(--color-accent)] bg-[var(--color-accent)]/15 shadow-[0_0_0_1px_var(--color-accent)]"
+              : "border-[var(--color-accent)]/30 bg-[var(--color-surface-2)] hover:border-[var(--color-accent)] hover:bg-[var(--color-accent)]/10"
           )}
         >
           <div className="flex items-center gap-2">
