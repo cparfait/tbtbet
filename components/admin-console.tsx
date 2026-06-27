@@ -437,7 +437,9 @@ export function AdminConsole({ users, teams, pools, matches, currentUserId }: Ad
     try {
       await apiCall("/api/admin/seed-test", "POST", { phase });
       setConfirmTestPhase(null);
-      ok(`Scénario « ${phase} » chargé (10 joueurs, paris posés).`);
+      setMessage(`Scénario « ${phase} » chargé (10 joueurs, paris posés).`);
+      // Rechargement complet pour vider le cache RSC de toutes les pages.
+      window.location.href = "/admin";
     } catch (e) { err(e); }
     finally { setTestLoading(null); }
   }

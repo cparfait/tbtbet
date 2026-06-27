@@ -9,7 +9,10 @@ export const authConfig = {
     signIn: "/login",
   },
   trustHost: true,
-  session: { strategy: "jwt" },
+  session: {
+    strategy: "jwt",
+    maxAge: process.env.NODE_ENV === "development" ? 60 * 60 : 30 * 24 * 60 * 60, // 1h dev, 30j prod
+  },
   callbacks: {
     /** Protège les routes : seules les pages publiques sont accessibles sans session. */
     authorized({ auth, request }) {
