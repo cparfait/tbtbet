@@ -95,10 +95,10 @@ export default async function BracketPage() {
         <Card className="p-2.5 hover:border-[var(--color-accent)]/30 transition-colors min-w-[160px]">
           <span className={`text-[10px] font-medium ${cls}`}>{text}</span>
           <div className="mt-1 space-y-1">
-            <div className={`flex items-center justify-between gap-2 ${isFinished && match.result === "TEAM_A" ? "text-[var(--color-accent)]" : ""}`}>
+            <div className={`flex items-center justify-between gap-2 ${isFinished && match.result === "TEAM_A" ? "text-[var(--color-accent)]" : isFinished && match.result === "TEAM_B" ? "text-red-400" : ""}`}>
               <div className="flex items-center gap-1.5 min-w-0">
                 <TeamLogo url={match.teamA?.logoUrl} name={match.teamA?.name ?? "?"} poolColor={phaseColor} className="size-4 rounded" />
-                <span className={`text-xs font-medium truncate${eliminatedA ? " line-through text-red-400" : ""}`}>
+                <span className={`text-xs font-medium truncate${eliminatedA ? " line-through" : ""}`}>
                   {match.teamA?.name ?? "?"}
                 </span>
               </div>
@@ -107,14 +107,14 @@ export default async function BracketPage() {
                 {isFinished && <span className="text-xs font-bold">{match.scoreA}</span>}
               </div>
             </div>
-            <div className={`flex items-center justify-between gap-2 ${isFinished && match.result === "TEAM_B" ? "text-[var(--color-accent)]" : ""}`}>
+            <div className={`flex items-center justify-between gap-2 ${isFinished && match.result === "TEAM_B" ? "text-[var(--color-accent)]" : isFinished && match.result === "TEAM_A" ? "text-red-400" : ""}`}>
               <div className="flex items-center gap-1.5 min-w-0">
                 {hasTBD ? (
                   <span className="text-[10px] italic text-[var(--color-muted)]">À déterminer…</span>
                 ) : (
                   <>
                     <TeamLogo url={match.teamB?.logoUrl} name={match.teamB?.name ?? "?"} poolColor={phaseColor} className="size-4 rounded" />
-                    <span className={`text-xs font-medium truncate${eliminatedB ? " line-through text-red-400" : ""}`}>
+                    <span className={`text-xs font-medium truncate${eliminatedB ? " line-through" : ""}`}>
                       {match.teamB?.name}
                     </span>
                   </>
