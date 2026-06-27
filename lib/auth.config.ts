@@ -24,7 +24,14 @@ export const authConfig = {
         nextUrl.pathname.startsWith("/api/register");
 
       if (isPublic) return true;
-      return isLoggedIn;
+      if (isLoggedIn) return true;
+
+      // Redirige vers /login en utilisant AUTH_URL pour éviter que Docker
+      // construise l'URL depuis le host interne (0.0.0.0:3000).
+      const base = process.env.AUTH_URL ?? nextUrl.origin;
+      const loginUrl = new URL("/login", base);
+      loginUrl.searchParams.set("next", nextUrl.pathname);
+      return Response.redirect(loginUrl);
     },
     jwt({ token, user }) {
       if (user) {
